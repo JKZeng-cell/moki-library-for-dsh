@@ -10,7 +10,7 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 
 从「找文件」到「看内容、改选区、检查保存」，在一个工作流程里完成。既可以整理项目资料，也可以把文档、表格与当前对话并排打开。
 
-[五组用法演示](docs/usage-demos.zh-CN.md) · [预览与编辑格式支持](docs/formats.zh-CN.md) · [图文素材](docs/social/README.md)
+[五组用法演示](docs/usage-demos.zh-CN.md) · [侧边工作区制作 PPT](docs/ppt-side-workspace.zh-CN.md) · [预览与编辑格式支持](docs/formats.zh-CN.md) · [图文素材](docs/social/README.md)
 
 [复制指令，让 DSH 安装](#install-with-dsh) · [下载安装包](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/latest) · [完整使用说明](docs/guide.zh-CN.md) · [功能介绍](docs/features.md) · [反馈与建议](https://github.com/JKZeng-cell/moki-library-for-dsh/issues)
 
@@ -49,9 +49,9 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 请帮我在当前 DSH 桌面端安装「MOKI资料库」插件，完成下载、安装和版本验证。
 
 仓库：https://github.com/JKZeng-cell/moki-library-for-dsh
-版本：0.1.58
-安装包：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.58/dsh-moki-library-0.1.58.tgz
-SHA256：1f6a1bc6098401ef7684762ce617d819303b0d41bb816f7e8a3ab275773bfb49
+版本：0.1.59
+安装包：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.59/dsh-moki-library-0.1.59.tgz
+SHA256：e381a5c177143dc5e1917b9bdec4ceb2627f8a503677c80708beea8dd6f0343e
 
 请依次执行：
 1. 检查当前系统、DSH 版本和它使用的 Node.js。插件要求 DSH >=0.2.2-rc.1 <0.3.0、Node.js >=22.19，主要验证环境为 Windows 桌面端。
@@ -61,7 +61,7 @@ SHA256：1f6a1bc6098401ef7684762ce617d819303b0d41bb816f7e8a3ab275773bfb49
    dsh plugin --profile desktop add "dsh-moki-library@file:<安装包绝对路径>" --allow-build=sharp
 5. 执行版本检查：
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   以命令结果确认安装到 desktop 的版本为 0.1.58（或原有的更新版本）。保留现有插件、配置和资料库数据。
+   以命令结果确认安装到 desktop 的版本为 0.1.59（或原有的更新版本）。保留现有插件、配置和资料库数据。
 6. 汇报安装包位置、实际使用的 CLI、配置和版本检查结果，再提醒我保存工作、手动完全退出并重新打开 DSH。安装任务进行中请保持当前 DSH 会话运行。
 
 如果当前会话不能下载或执行终端、环境不兼容，或安装失败，请说明具体原因和下一步操作，安装状态以实际命令结果为准。
@@ -75,12 +75,12 @@ SHA256：1f6a1bc6098401ef7684762ce617d819303b0d41bb816f7e8a3ab275773bfb49
 
 ### 方式二：在终端手动安装
 
-1. 先启动一次 DSH 桌面端完成配置初始化，再完全退出。在 [Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58) 下载 `dsh-moki-library-0.1.58.tgz`。
+1. 先启动一次 DSH 桌面端完成配置初始化，再完全退出。在 [Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.59) 下载 `dsh-moki-library-0.1.59.tgz`。
 2. 在 PowerShell 中把前两行替换为实际路径，再执行安装。若桌面端使用了自定义 `DSH_HOME`，终端也要沿用同一个值。
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.58.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.59.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```

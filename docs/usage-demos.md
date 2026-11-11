@@ -58,6 +58,10 @@ Legacy `.doc` is preview-only; convert it to `.docx` first. Text files above 5 M
 
 ## 4. PowerPoint: edit a specific text box
 
+![Edit PPT titles through conversation in the side workspace](media/social-ppt-side-workspace.png)
+
+[Full guide: create and edit PPTs in the side workspace](ppt-side-workspace.md). Start a new presentation or refine selected objects and text in an existing deck. Give instructions in the conversation and review the draft beside it.
+
 1. Open `.pptx`, enter the editor and select the intended slide.
 2. Selecting an object provides its object context. Entering its text box and highlighting characters provides an exact text selection.
 3. Press **Alt+D**, add the selection and ask: “Replace the selected heading with ‘Review before saving’. Preserve the text-box position, font size and all other slides.”

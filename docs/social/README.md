@@ -1,5 +1,9 @@
 # Media kit / 图文素材包
 
+- [PPT side-workspace introduction / PPT 侧边工作区介绍](../ppt-side-workspace.zh-CN.md) · [English](../ppt-side-workspace.md).
+- `../media/social-ppt-side-workspace.png`: additional 3:4 feature page showing a PPT title selection, native conversation reference and unsent editing request / 新增 3:4 竖版，展示 PPT 标题选区、原生会话引用与待发送的修改要求。
+- `../media/raw/ppt-side-workspace.png`: actual local DSH Web capture with synthetic presentation content / 使用公开演示资料的本机 DSH Web 原始截图。
+
 - `../media/cover.png`: wide cover with file management, editing and DSH floating chat / 包含文件管理、编辑与 DSH 浮窗的横版封面。
 - `../media/cover-portrait.png`: portrait cover with DSH floating collaboration / 包含 DSH 浮窗协作的小红书竖版封面。
 - `../media/dsh-workspace.png`: full DSH interface, library list and conversation reference / DSH 完整界面、资料库列表与会话引用输入（1600 × 900）。

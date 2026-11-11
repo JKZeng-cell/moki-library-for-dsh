@@ -10,7 +10,7 @@ MOKI Library is a community plugin for **DeepSeek Harness (DSH)**. It brings a l
 
 Move from finding a file to reading, selecting, editing and saving it in one workflow. Organize a project, then keep its documents and spreadsheets beside the conversation.
 
-[Five usage demos](docs/usage-demos.md) · [Preview and editing format support](docs/formats.md) · [Media kit](docs/social/README.md)
+[Five usage demos](docs/usage-demos.md) · [Create PPTs in the side workspace](docs/ppt-side-workspace.md) · [Preview and editing format support](docs/formats.md) · [Media kit](docs/social/README.md)
 
 [Copy a prompt to install with DSH](#install-with-dsh) · [Download](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/latest) · [Usage guide (中文)](docs/guide.zh-CN.md) · [Features](docs/features.md) · [Report an issue](https://github.com/JKZeng-cell/moki-library-for-dsh/issues)
 
@@ -49,9 +49,9 @@ Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.
 Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
 
 Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
-Version: 0.1.58
-Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.58/dsh-moki-library-0.1.58.tgz
-SHA256: 1f6a1bc6098401ef7684762ce617d819303b0d41bb816f7e8a3ab275773bfb49
+Version: 0.1.59
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.59/dsh-moki-library-0.1.59.tgz
+SHA256: e381a5c177143dc5e1917b9bdec4ceb2627f8a503677c80708beea8dd6f0343e
 
 Follow these steps:
 1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
@@ -61,7 +61,7 @@ Follow these steps:
    dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
 5. Check the installed version:
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   Confirm that desktop lists version 0.1.58 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+   Confirm that desktop lists version 0.1.59 (or the newer version retained above). Preserve existing plugins, configuration and library data.
 6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
 
 If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
@@ -75,12 +75,12 @@ If this conversation cannot download files or execute a terminal, the environmen
 
 ### Option 2: Install manually in a terminal
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.58.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58).
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.59.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.59).
 2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.58.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.59.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```

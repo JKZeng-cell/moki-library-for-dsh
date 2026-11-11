@@ -66,13 +66,36 @@ DOCX/XLSX/PPTX 的结构化预览按需读取压缩包内的文档数据，不�
 
 ## 安装
 
-先启动一次 DSH 桌面端完成配置初始化，再完全退出。下载插件安装包后，在 DSH 桌面配置中通过 CLI 安装。Windows 的 CLI 位于 DSH 安装目录的 `resources/runtime/cli/bin/dsh.cmd`。将下面的路径换成实际的安装包绝对路径。
+### 让 DSH 完成安装
+
+在 DSH 桌面端打开新会话，选择可用模型，然后复制 [README 中的完整安装指令](../README.zh-CN.md#install-with-dsh)并发送。指令包含固定版本的插件包直链、SHA256、环境检查、`desktop` 配置安装和版本验证。当前会话需要能够下载文件并执行本机终端命令。
+
+等待 DSH 返回安装结果后，保存工作、手动完全退出并重新打开 DSH。安装任务进行中保持会话运行。重开后在插件列表确认「MOKI资料库」已启用，从侧边栏进入资料库；可用示例文件验证预览和 **Alt+D** 对话入口。
+
+### 手动安装与排查
+
+先启动一次 DSH 桌面端完成配置初始化，再完全退出。下载 [v0.1.58 Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58) 中的 `dsh-moki-library-0.1.58.tgz`，在桌面配置中通过 CLI 安装。Windows CLI 位于 DSH 安装目录的 `resources/runtime/cli/bin/dsh.cmd`；包含完整路径和 PowerShell 调用方法的步骤见 [README 的手动安装](../README.zh-CN.md#manual-install)。
+
+下面的简写适用于 `dsh` 已在 PATH 且对应当前桌面端的情况。将路径换成安装包实际绝对路径；有自定义 `DSH_HOME` 时沿用桌面端的值。
 
 ```powershell
 dsh plugin --profile desktop add 'dsh-moki-library@file:C:/Downloads/dsh-moki-library-0.1.58.tgz' --allow-build=sharp
 ```
 
-首次安装需要下载运行依赖。如果 DSH 插件管理器提示重启，按提示重新打开桌面端。
+安装成功后执行：
+
+```powershell
+dsh plugin --profile desktop list dsh-moki-library --depth 0
+```
+
+确认列出 `dsh-moki-library` 及预期版本，再重新打开桌面端。首次安装需要联网下载运行依赖。
+
+| 情况 | 处理方式 |
+| --- | --- |
+| DSH 只能回复文字，无法下载或执行命令 | 使用上述手动安装步骤，在本机 PowerShell 中执行 |
+| 终端提示找不到 `dsh` | 使用安装目录内的 `dsh.cmd` 完整路径；PowerShell 用 `&` 调用带空格的路径 |
+| 安装成功但侧边栏没有入口 | 检查是否使用 `desktop` 配置及同一个 `DSH_HOME`，完全退出重开，并在插件列表确认已启用 |
+| 下载或依赖安装失败 | 根据具体错误检查网络与环境，保留已下载的包供重试；以安装命令和版本检查结果确认状态 |
 
 ## 数据
 

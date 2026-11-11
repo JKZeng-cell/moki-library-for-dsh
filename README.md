@@ -12,7 +12,7 @@ Move from finding a file to reading, selecting, editing and saving it in one wor
 
 [Five usage demos](docs/usage-demos.md) · [Preview and editing format support](docs/formats.md) · [Media kit](docs/social/README.md)
 
-[Download](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/latest) · [Usage guide (中文)](docs/guide.zh-CN.md) · [Features](docs/features.md) · [Report an issue](https://github.com/JKZeng-cell/moki-library-for-dsh/issues)
+[Copy a prompt to install with DSH](#install-with-dsh) · [Download](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/latest) · [Usage guide (中文)](docs/guide.zh-CN.md) · [Features](docs/features.md) · [Report an issue](https://github.com/JKZeng-cell/moki-library-for-dsh/issues)
 
 ## What you can do
 
@@ -38,14 +38,60 @@ The collaboration illustration includes the DSH floating composer with a `Sheet1
 
 Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.2.2-rc.1 <0.3.0`; other desktop versions and operating systems need further verification. The plugin requires **Node.js 22.19+**. Native preview windows use a locally installed Edge or Chrome. FFmpeg is optional for additional audio/video decoding.
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.58.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58).
-2. Use the DSH CLI from the desktop installation, replacing the path below with your downloaded archive's absolute path:
+<a id="install-with-dsh"></a>
 
-```powershell
-dsh plugin --profile desktop add 'dsh-moki-library@file:C:/Downloads/dsh-moki-library-0.1.58.tgz' --allow-build=sharp
+### Option 1: Copy this prompt into DSH
+
+1. Open **DSH Desktop → New conversation**, select an available model, and make sure the conversation can run local terminal commands.
+2. Use the copy button at the top right of the following block. **Paste the entire prompt into the DSH conversation composer and send it.** This is an agent task; terminal commands are provided in the manual installation option below.
+
+```text
+Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
+
+Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
+Version: 0.1.58
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.58/dsh-moki-library-0.1.58.tgz
+SHA256: 1f6a1bc6098401ef7684762ce617d819303b0d41bb816f7e8a3ab275773bfb49
+
+Follow these steps:
+1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
+2. Locate the CLI belonging to this desktop installation. On Windows, prefer resources/runtime/cli/bin/dsh.cmd inside its installation directory. Use the desktop's existing DSH_HOME if one is set. Target the desktop profile.
+3. Check the installed dsh-moki-library version in desktop. Verify an existing identical version; retain and report a newer version. If installation is needed, download the .tgz above locally and verify its SHA256.
+4. Use the actual CLI and the downloaded archive's absolute path with this command pattern. Replace <absolute-archive-path> with that path, using forward slashes on Windows:
+   dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
+5. Check the installed version:
+   dsh plugin --profile desktop list dsh-moki-library --depth 0
+   Confirm that desktop lists version 0.1.58 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
+
+If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
 ```
 
-On Windows, the bundled command is `<DSH install directory>/resources/runtime/cli/bin/dsh.cmd`. First installation downloads the runtime dependencies. Restart DSH if the plugin manager requests it.
+3. Respond to DSH's prompts for the download or terminal operation, if shown, and wait for its installation and version-check results.
+4. Save your work, **fully quit DSH and reopen it**. Confirm that **MOKI Library** is enabled in the plugin list, then open it from the sidebar.
+5. Preview a sample file. In a supported editor, select text or cells and press **Alt+D** to check the conversation entry. Enable the library attachment picker or task-file mapping in library settings if needed.
+
+<a id="manual-install"></a>
+
+### Option 2: Install manually in a terminal
+
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.58.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58).
+2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
+
+```powershell
+$mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.58.tgz'
+$mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
+& $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
+```
+
+3. After the install command succeeds, check the version, then reopen DSH:
+
+```powershell
+& $mokiDshCli plugin --profile desktop list dsh-moki-library --depth 0
+```
+
+If `dsh` is on PATH and belongs to the current desktop installation, use it in place of `& $mokiDshCli`. `--profile desktop` targets the desktop profile; `--allow-build=sharp` allows the installation build step for the `sharp` image dependency. Initial installation requires network access for runtime dependencies. See the [official DSH CLI reference](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cli-help.md#dsh-plugin) for profile command syntax.
 
 The GitHub source archive is for development; the `.tgz` release asset is the built plugin. This release does not require an npm publication.
 

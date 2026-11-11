@@ -612,6 +612,8 @@ test('PPT text selection hands off its exact shape range without overwriting rem
     browser=await puppeteer.launch({executablePath,headless:true,pipe:true})
     const page=await browser.newPage();await page.setViewport({width:1600,height:1000});await page.goto(session.viewerUrl)
     await page.waitForFunction(()=>window.univerAPI?.getActivePresentation?.())
+    await page.evaluate(()=>window.postMessage({type:'moki:univer-theme',dark:true},location.origin))
+    await page.waitForFunction(()=>univerAPI.isDarkMode())
     const before=await page.evaluate(()=>{
       const p=univerAPI.getActivePresentation(),s=p.getSlides()[1];p.setActiveSlide(s)
       window.qaSelections=[];window.qaCompose=[]

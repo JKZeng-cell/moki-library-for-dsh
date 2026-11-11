@@ -579,6 +579,30 @@ if (patchedViewerModule.includes(viewerBoot)) {
 } else if (!patchedViewerModule.includes(viewerBootWithBridge)) {
   throw new Error(`Unable to expose the Univer viewer content bridge in ${viewerModuleFile}`);
 }
+// Slides are presentation artwork: dark editor chrome must not invert their
+// paper, text or explicit fills. Install a color resolver on the slide viewer's
+// own render service before loading the unit so cached thumbnails and the live
+// text editor use the same original colors. Sheets and documents keep their
+// existing theme behavior, and no presentation data is rewritten.
+const canvasColorModule = "es-C_3AFWIu.js";
+const canvasColorSource = await readFile(join(viewerAssetsDir, canvasColorModule), "utf8");
+if (!canvasColorSource.includes("h_ as jD") || !patchedViewerModule.includes("isDarkMode(){return this._injector.get(c_).darkMode}")) {
+  throw new Error("Unable to locate the pinned Univer canvas color and theme services");
+}
+const liveSlideLoad = "else if(e.unitType===3)await c.loadSlideAsync(e.unitId);";
+const snapshotSlideLoad = "else if(e.unitType===3){let e=gc(r);i=e.id??``,n.createUnit(k.UNIVER_SLIDE,e)}";
+if (!patchedViewerModule.includes(liveSlideLoad) || !patchedViewerModule.includes(snapshotSlideLoad)) {
+  throw new Error(`Unable to preserve slide colors before loading the presentation in ${viewerModuleFile}`);
+}
+patchedViewerModule = `import {jD as mokiCanvasColorService} from "./${canvasColorModule}";
+function mokiPreserveSlideColors(univer) {
+  const injector = univer.__getInjector();
+  const theme = injector.get(c_);
+  const canvasColors = injector.get(mokiCanvasColorService);
+  canvasColors.getRenderColor = color => theme.isValidThemeColor(color) ? theme.getColorFromTheme(color) : color;
+}
+` + patchedViewerModule.replace(liveSlideLoad, "else if(e.unitType===3){mokiPreserveSlideColors(a);await c.loadSlideAsync(e.unitId);}")
+  .replace(snapshotSlideLoad, "else if(e.unitType===3){mokiPreserveSlideColors(n);let e=gc(r);i=e.id??``,n.createUnit(k.UNIVER_SLIDE,e)}");
 const renderPresetName = (await readdir(viewerAssetsDir)).find((name) => /^render-preset-(?!.*-moki-).*\.js$/u.test(name));
 if (!renderPresetName) throw new Error(`Unable to locate the Univer render preset in ${viewerAssetsDir}`);
 const renderPresetFile = join(viewerAssetsDir, renderPresetName);

@@ -1,0 +1,42 @@
+/* File metadata and feedback share one row with the editor controls. */
+[data-dsh-file-preview][data-preview-embedded] {padding:0!important;background:var(--moki-surface)!important}
+.resource-preview-header.dsh-file-bar {
+  position:relative;z-index:35;display:flex;flex:0 0 38px;height:38px;min-height:38px;
+  box-sizing:border-box;align-items:center;justify-content:space-between;flex-wrap:nowrap;
+  gap:8px;margin:0;padding:4px 10px;border-bottom:1px solid var(--moki-border);
+  background:var(--moki-surface);color:var(--moki-text);font:400 12px/18px var(--font-ui)
+}
+.dsh-file-summary {display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.dsh-file-details {min-width:0;max-width:100%}
+.dsh-file-details summary {display:flex;align-items:center;gap:4px;min-width:0;min-height:26px;cursor:pointer;color:var(--moki-text);border-radius:5px;padding:0 2px;list-style:none}
+.dsh-file-details summary::-webkit-details-marker {display:none}
+.dsh-file-details summary:hover,.dsh-file-details summary:focus-visible,.dsh-file-status:hover {background:var(--moki-surface-hover)}
+.dsh-file-details summary svg {flex:none;color:var(--moki-text-muted)}
+.dsh-file-details[open] summary svg {transform:rotate(180deg)}
+.dsh-file-details .resource-preview-name {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 13px/19px var(--font-ui);color:inherit}
+.dsh-file-status {display:inline-flex;min-width:0;max-width:40%;gap:4px;align-items:center;overflow:hidden;color:var(--moki-text-muted);padding:1px 3px;font:400 11px/16px var(--font-ui);border-radius:4px}
+.dsh-file-status span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsh-file-status svg {flex:none}
+.dsh-file-status[data-warning] {color:var(--dsw-alias-state-error-primary,var(--moki-danger))}
+.dsh-file-detail-popover {position:absolute;left:8px;top:calc(100% + 2px);z-index:3;width:max-content;max-width:min(420px,calc(100% - 16px));box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--moki-control-border);background:var(--moki-surface);color:var(--moki-text);box-shadow:0 6px 24px #0002;overflow-wrap:anywhere;user-select:text}
+.dsh-file-detail-popover strong {font-weight:500}
+.dsh-file-detail-popover p {margin:4px 0 0;color:var(--moki-text-muted);font:400 12px/17px var(--font-ui)}
+.dsh-file-detail-popover kbd,.dsh-file-actions .dsh-key-hint {padding:0 3px;border-radius:3px;color:var(--moki-text-muted);font:400 10px/14px var(--font-ui)}
+.resource-preview-header .resource-preview-actions.dsh-file-actions {display:flex;flex:none;align-items:center;flex-wrap:nowrap;gap:4px;max-width:calc(100% - 56px);min-width:0;margin:0;overflow-x:auto;scrollbar-width:none}
+.resource-preview-header .dsh-file-actions::-webkit-scrollbar {display:none}
+.dsh-file-bar .dsh-file-actions button.moki-ui-button {height:27px;min-height:27px;flex:none;border-radius:6px;padding:0 7px;font:500 12px/17px var(--font-ui)}
+.dsh-file-bar .dsh-file-actions .moki-ui-button-content {gap:4px}
+.dsh-file-bar .dsh-file-actions button.moki-ui-icon-button {padding:0;width:27px;min-width:27px}
+.dsh-preview-content {isolation:isolate;background:var(--moki-surface)}
+@media (max-width:680px) {
+  .resource-preview-header.dsh-file-bar {gap:5px;padding-inline:6px}
+  .dsh-file-actions .dsh-key-hint {display:none}
+  .dsh-file-status {max-width:42%}
+}
+@media (max-width:520px) {
+  .dsh-compact-action .dsh-action-label {display:none}
+  .dsh-file-bar .dsh-file-actions button.dsh-compact-action {width:27px;min-width:27px;padding:0}
+  .dsh-file-summary {gap:2px}
+  .dsh-file-status {max-width:38%}
+  .dsh-file-status[data-warning] {min-width:16px}
+}

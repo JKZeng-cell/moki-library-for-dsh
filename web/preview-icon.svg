@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" color="#302f38">
+  <title>MOKI资料库</title>
+  <rect width="24" height="24" rx="5.28" fill="#f8f5ee"/>
+  <g fill="none" stroke="currentColor" stroke-width="1.3125" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3.25" y="7.1875" width="3.71875" height="12.03125" rx="0.875"/>
+    <rect x="9.462499999999999" y="4.78125" width="3.5875000000000004" height="14.4375" rx="0.875"/>
+    <rect x="15.71875" y="7.40625" width="3.2375000000000007" height="11.943749999999998" rx="0.8312499999999999" transform="rotate(-13 15.71875 7.40625)"/>
+    <path d="M3.25 10.90625h3.71875 M9.462499999999999 16.15625h3.5875000000000004"/>
+  </g>
+</svg>

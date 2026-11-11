@@ -1,0 +1,44 @@
+/* These optional settings-navigation styles leave ordinary dialogs unchanged. */
+.moki-settings-dialog[hidden] { display: none !important; }
+.moki-settings-dialog[data-settings-dialog-footer="true"] {
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  overflow: hidden;
+}
+.moki-settings-dialog > .moki-settings-dialog-header > .moki-settings-dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.moki-settings-dialog-heading h2 { min-width: 0; }
+.moki-settings-dialog .moki-settings-dialog-back {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--moki-border);
+  border-radius: var(--moki-radius-control);
+  background: var(--moki-surface-subtle);
+  color: var(--moki-text-muted);
+}
+.moki-settings-dialog .moki-settings-dialog-back:hover:not(:disabled) {
+  background: var(--moki-surface-hover);
+  color: var(--moki-text);
+}
+.moki-settings-dialog-footer {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--moki-border);
+  background: var(--moki-surface);
+}
+@media (max-width: 480px) {
+  .moki-settings-dialog-footer { padding: 12px 16px; }
+}

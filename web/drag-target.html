@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>加入 DSH 对话草稿</title>
+<style>
+  html,body { margin:0; height:100%; background:transparent; }
+  body { display:grid; place-items:center; box-sizing:border-box; border:2px dashed var(--accent); border-radius:14px; }
+  span { visibility:hidden; border-radius:6px; padding:4px 9px; font:500 13px/20px system-ui,sans-serif; background:var(--fill); color:var(--text); }
+  body[data-over] span { visibility:visible; }
+</style>
+<body><span>松开以加入对话草稿</span>
+<script>
+  const params=new URLSearchParams(location.hash.slice(1));
+  for (const key of ['accent','fill','text']) document.body.style.setProperty('--'+key,params.get(key));
+  const type='application/x-moki-library-selection';
+  function accept(event) {
+    if (!event.dataTransfer.types.includes(type)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect='copy';
+    document.body.dataset.over='';
+  }
+  window.addEventListener('dragenter',accept);
+  window.addEventListener('dragover',accept);
+  window.addEventListener('dragleave',event=>{if (!event.relatedTarget) delete document.body.dataset.over;});
+  window.addEventListener('drop',event=>{
+    event.preventDefault();
+    if (event.dataTransfer.getData(type)===params.get('token')) {
+      parent.postMessage({type:'library-chat-drop',token:params.get('token')},params.get('parent'));
+    }
+  });
+</script>

@@ -1,0 +1,83 @@
+/* Shared chrome motion. Keep geometry, anchored menus and scroll positions fixed. */
+:root {
+  --moki-motion-fast: 140ms;
+  --moki-motion-normal: 180ms;
+  --moki-motion-ease: cubic-bezier(.2,.7,.2,1);
+}
+
+button.moki-ui-button,
+.moki-ui-input,
+.moki-ui-select,
+.desktop-app-sidebar nav :is(a,button),
+.moki-tool-tab,
+.subagent-workspace-tabs button,
+.moki-settings-page-dialog nav button,
+.moki-menu-item,
+.library-menu .library-menu-item,
+.library-resource-list-row,
+.subagent-conversation-item,
+.subagent-conversation-row,
+[data-assistant-session-menu] {
+  transition: background-color var(--moki-motion-fast) var(--moki-motion-ease),
+    border-color var(--moki-motion-fast) var(--moki-motion-ease),
+    color var(--moki-motion-fast) var(--moki-motion-ease),
+    box-shadow var(--moki-motion-fast) var(--moki-motion-ease);
+}
+
+/* Animate the inner artwork, not the pointer target or popup anchor. */
+.moki-ui-button-content,
+.desktop-app-sidebar nav :is(a,button) > svg {
+  transition: transform var(--moki-motion-fast) var(--moki-motion-ease);
+}
+button.moki-ui-button:not(:disabled):active > .moki-ui-button-content { transform: scale(.97); }
+.desktop-app-sidebar nav :is(a,button:not(:disabled)):active > svg { transform: scale(.92); }
+.moki-ui-button-progress { animation: moki-motion-fade-in var(--moki-motion-fast) ease-out; }
+
+/* No transform on dialogs or menus: client-boundary/anchor measurements stay accurate. */
+.moki-menu-surface,
+dialog.moki-ui-dialog[open] {
+  animation: moki-motion-fade-in var(--moki-motion-normal) var(--moki-motion-ease);
+}
+dialog.moki-ui-dialog[open]::backdrop {
+  animation: moki-motion-fade-in var(--moki-motion-normal) ease-out;
+}
+.moki-menu-surface :is([role="menuitem"],[role="menuitemradio"]):active { transform: none; }
+.moki-conversation-latest > .moki-ui-button {
+  animation: moki-motion-fade-in var(--moki-motion-normal) var(--moki-motion-ease);
+}
+.shell-main-scroll, .desktop-update-card {
+  animation: moki-motion-content-in var(--moki-motion-normal) var(--moki-motion-ease);
+}
+
+/* Switches share timing without overriding their distinct thumb coordinates. */
+.moki-switch-track, button.moki-settings-toggle {
+  transition: background-color var(--moki-motion-fast) var(--moki-motion-ease), border-color var(--moki-motion-fast) var(--moki-motion-ease);
+}
+.moki-switch-thumb, .moki-switch .moki-switch-thumb,
+button.moki-settings-toggle > .moki-switch-thumb {
+  transition: transform var(--moki-motion-fast) var(--moki-motion-ease),
+    translate var(--moki-motion-fast) var(--moki-motion-ease),
+    left var(--moki-motion-fast) var(--moki-motion-ease);
+}
+
+@keyframes moki-motion-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes moki-motion-content-in { from { opacity: .78; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --moki-motion-fast: 0ms; --moki-motion-normal: 0ms; }
+  button.moki-ui-button, .moki-ui-button-content, .moki-ui-button-progress,
+  .moki-ui-input, .moki-ui-select, .desktop-app-sidebar nav :is(a,button),
+  .desktop-app-sidebar nav :is(a,button) > svg, .moki-tool-tab,
+  .subagent-workspace-tabs button, .moki-settings-page-dialog nav button,
+  .moki-menu-item, .library-menu .library-menu-item, .library-resource-list-row,
+  .subagent-conversation-item, .subagent-conversation-row, [data-assistant-session-menu],
+  .moki-menu-surface, dialog.moki-ui-dialog[open],
+  dialog.moki-ui-dialog[open]::backdrop, .moki-conversation-latest > .moki-ui-button,
+  .shell-main-scroll, .desktop-update-card, .moki-switch-track,
+  button.moki-settings-toggle, .moki-switch-thumb {
+    animation: none !important;
+    transition: none !important;
+  }
+  button.moki-ui-button:not(:disabled):active > .moki-ui-button-content,
+  .desktop-app-sidebar nav :is(a,button:not(:disabled)):active > svg { transform: none; }
+}

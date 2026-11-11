@@ -1,0 +1,36 @@
+.resource-file-icon {
+  --file-ink: #596579;
+  --file-fill: #edf0f5;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: 8px;
+  color: var(--file-ink);
+  background: var(--file-fill);
+}
+.resource-file-icon[data-size="40"] { width: 40px; height: 40px; border-radius: 12px; }
+.resource-file-icon > svg { width: 75%; height: 75%; }
+.resource-file-icon[data-tone="red"] { --file-ink: #b33c53; --file-fill: #ffedf0; }
+.resource-file-icon[data-tone="blue"] { --file-ink: #3568b8; --file-fill: #e8f0ff; }
+.resource-file-icon[data-tone="green"] { --file-ink: #247851; --file-fill: #e4f5eb; }
+.resource-file-icon[data-tone="orange"] { --file-ink: #b4552d; --file-fill: #ffede4; }
+.resource-file-icon[data-tone="teal"] { --file-ink: #247c82; --file-fill: #e3f4f4; }
+.resource-file-icon[data-tone="purple"] { --file-ink: #7250b5; --file-fill: #f0eafb; }
+.resource-file-icon[data-tone="pink"] { --file-ink: #b34883; --file-fill: #fce8f2; }
+.resource-file-icon[data-tone="amber"] { --file-ink: #936215; --file-fill: #fff2d8; }
+html[data-color-scheme="dark"] .resource-file-icon { --file-ink: #bec9dc; --file-fill: #30394a; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="red"] { --file-ink: #ff9aa9; --file-fill: #492d39; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="blue"] { --file-ink: #91bcff; --file-fill: #233852; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="green"] { --file-ink: #83d9aa; --file-fill: #203e34; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="orange"] { --file-ink: #ffb38e; --file-fill: #48352f; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="teal"] { --file-ink: #80d6db; --file-fill: #203e44; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="purple"] { --file-ink: #bca3ff; --file-fill: #352e50; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="pink"] { --file-ink: #efa1ce; --file-fill: #472e43; }
+html[data-color-scheme="dark"] .resource-file-icon[data-tone="amber"] { --file-ink: #f5cd78; --file-fill: #443b29; }
+.resource-file-icon-thumbnail-mark { position: absolute; right: 0; bottom: 0; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px 0 0 0; background: var(--file-fill); color: var(--file-ink); }
+.resource-file-icon-thumbnail-mark svg { width: 12px; height: 12px; }
+.resource-file-icon[data-size="40"] .resource-file-icon-thumbnail-mark { width: 18px; height: 18px; }

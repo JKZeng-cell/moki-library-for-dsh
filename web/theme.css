@@ -1,0 +1,53 @@
+html[data-color-scheme] {
+  color-scheme:light;
+  --font-ui:system-ui,"Microsoft YaHei UI",sans-serif;
+  --moki-surface:var(--dsw-alias-bg-base,Canvas);
+  --moki-surface-subtle:var(--dsw-alias-bg-layer-1,Canvas);
+  --moki-surface-hover:var(--dsw-alias-interactive-bg-hover,ButtonFace);
+  --moki-floating:var(--dsw-alias-button-floating-fill,var(--moki-surface));
+  --moki-text:var(--dsw-alias-label-primary,CanvasText);
+  --moki-text-muted:var(--dsw-alias-label-secondary,GrayText);
+  --moki-caption:var(--dsw-alias-label-tertiary,var(--moki-text-muted));
+  --moki-border:var(--dsw-alias-border-l1,ButtonBorder);
+  --moki-control-border:var(--dsw-alias-border-l2,ButtonBorder);
+  --moki-accent:var(--dsw-alias-brand-primary,Highlight);
+  --moki-accent-hover:var(--dsw-alias-button-primary-hover,var(--moki-accent));
+  --moki-on-accent:var(--dsw-alias-label-primary-foreground,HighlightText);
+  --moki-accent-soft:var(--dsw-alias-interactive-bg-active,ButtonFace);
+  --moki-focus:var(--dsw-alias-link,Highlight);
+  --moki-success:var(--dsw-alias-state-success-primary,CanvasText);
+  --moki-success-soft:var(--dsw-alias-state-success-secondary,ButtonFace);
+  --moki-warning:var(--dsw-alias-state-warn-label,CanvasText);
+  --moki-warning-soft:var(--dsw-alias-state-warn-secondary,ButtonFace);
+  --moki-danger:var(--dsw-alias-state-error-primary,CanvasText);
+  --moki-danger-soft:var(--dsw-alias-interactive-bg-hover-danger,ButtonFace);
+  --moki-info:var(--dsw-alias-link,LinkText);
+  --moki-info-soft:var(--moki-surface-hover);
+  --moki-search-border:var(--moki-control-border);
+  --moki-search-hover-border:var(--dsw-alias-border-l3,ButtonBorder);
+  --moki-search-focus-border:var(--moki-focus);
+  --moki-search-surface:var(--moki-surface);
+  --moki-search-text:var(--moki-text);
+  --moki-search-placeholder:var(--moki-caption);
+  --moki-search-icon:var(--moki-text-muted);
+  --moki-radius-control:var(--dsw-radius-sm,8px);
+  --moki-radius-inner:var(--dsw-radius-sm,8px);
+  --moki-radius-surface:var(--dsw-radius-md,12px);
+  --dialog-header-background:var(--moki-surface);
+  --dialog-header-border:var(--moki-border);
+  --dialog-header-ink:var(--moki-text);
+  --dialog-header-muted:var(--moki-text-muted);
+  --dialog-close-background:transparent;
+  --dialog-close-hover:var(--moki-surface-hover);
+  --moki-shadow-card:none;
+  --moki-shadow-dialog:0 12px 40px #0003,0 2px 6px #0001;
+  --library-caption:var(--dsw-font-xxs-12,12px/18px var(--font-ui));
+  --library-body:var(--dsw-font-xs-13,13px/20px var(--font-ui));
+  --library-label:var(--dsw-font-s-14,14px/22px var(--font-ui));
+}
+html[data-color-scheme="dark"] { color-scheme:dark; }
+html,body,#root { height:100%; min-height:0; min-width:0; margin:0; overflow:hidden; }
+body { background:var(--moki-surface); color:var(--moki-text); font:var(--library-body); }
+button,input,textarea,select { font-family:var(--font-ui); }
+button:focus-visible, summary:focus-visible, [tabindex="0"]:focus-visible { outline:2px solid var(--moki-focus); outline-offset:-2px; }
+button:disabled { cursor:default; }

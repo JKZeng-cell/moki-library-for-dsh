@@ -1,0 +1,10 @@
+.moki-request-error-notice.moki-ui-card { display:flex; flex-shrink:0; align-items:flex-start; flex-wrap:wrap; gap:12px; padding:16px; min-width:0; box-shadow:none; }
+.moki-request-error-icon { display:grid; place-items:center; flex:none; width:36px; height:36px; border-radius:var(--moki-radius-control); color:var(--moki-warning); background:var(--moki-warning-soft); }
+.moki-request-error-copy { flex:1; min-width:140px; overflow-wrap:anywhere; }
+.moki-request-error-copy h3 { margin:0; color:var(--moki-text); font-size:16px; font-weight:650; line-height:24px; }
+.moki-request-error-copy > p { margin-top:4px; color:var(--moki-text-muted); font-size:13px; line-height:20px; }
+.moki-request-error-copy details { margin-top:6px; color:var(--moki-text-muted); font-size:12px; line-height:18px; }
+.moki-request-error-copy summary { width:fit-content; cursor:pointer; min-height:24px; line-height:24px; border-radius:4px; }
+.moki-request-error-copy summary:focus-visible { outline:2px solid var(--moki-focus); outline-offset:2px; }
+.moki-request-error-copy details p { margin-top:8px; padding:12px; max-height:96px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; background:var(--moki-surface-subtle); border-radius:var(--moki-radius-control); }
+.moki-request-error-notice > .moki-ui-button { flex:none; margin-left:auto; max-width:100%; }

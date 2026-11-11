@@ -1,0 +1,16 @@
+.library-path-container { flex: 1 1 160px; min-width: 0; }
+.library-path-bar { display: flex; align-items: center; gap: 5px; width: 100%; }
+.library-path-field { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; height: 32px; padding: 0 9px; box-sizing: border-box; border: 1px solid var(--moki-control-border); border-radius: 7px; background: var(--moki-surface); color: var(--moki-text-muted); }
+.library-path-field:focus-within { border-color: var(--moki-accent); }
+.library-path-icon { flex: none; }
+.library-path-track { position: relative; flex: 1; min-width: 0; height: 100%; }
+.library-path-track input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; outline: 0; background: transparent; color: transparent; caret-color: transparent; font: 400 13px/20px var(--font-ui); }
+.library-path-field[data-editing] input { color: var(--moki-text); caret-color: auto; }
+.library-path-field:not([data-editing]) input { opacity: 0; }
+.library-path-crumbs { position: absolute; inset: 0; display: flex; align-items: center; gap: 2px; overflow: auto hidden; pointer-events: none; scrollbar-width: none; }
+.library-path-crumbs > span { gap: 2px; height: auto; }
+#resource-library-page .library-path-crumbs button, #resource-library-page .library-path-up { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 24px; min-height: 0; padding: 0 4px; border: 0; border-radius: 4px; background: transparent; color: var(--moki-text-muted); font: 400 13px/20px var(--font-ui); pointer-events: auto; cursor: pointer; }
+#resource-library-page .library-path-crumbs button[aria-current] { color: var(--moki-text); cursor: text; }
+#resource-library-page .library-path-up { width: 30px; height: 30px; }
+#resource-library-page .library-path-bar button:is(:hover,:focus-visible) { background: var(--moki-surface-hover); color: var(--moki-text); }
+.library-path-error { margin: 4px 0 0; color: var(--dsw-alias-state-error-primary,var(--moki-danger)); overflow-wrap: anywhere; font-size: 12px; }

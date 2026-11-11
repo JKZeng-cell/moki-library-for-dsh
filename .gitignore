@@ -1,0 +1,37 @@
+# Dependencies, build diagnostics and local state
+node_modules/
+/.dev/
+/.dsh/
+/.workbench/
+/.playwright-cli/
+/data/
+/runtime/
+/sessions/
+/attachments/
+/output/
+/artifacts/
+/tmp/
+/coverage/
+*.log
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.tgz
+*.map
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
+*.pfx
+*.p12
+Thumbs.db
+.DS_Store
+
+# Generated package is distributed in Releases; source stays reproducible.
+/app/
+/lib/
+/client.js

@@ -1,0 +1,10 @@
+.resource-permission-dialog { max-width:800px; }
+.resource-permission-dialog .moki-settings-dialog-body { display:flex; flex-direction:column; gap:16px; }
+.resource-permission-dialog .moki-settings-dialog-footer > span { margin-right:auto; }
+.resource-permission-toolbar { display:flex; align-items:center; gap:12px; }
+.resource-permission-toolbar > label { position:relative; flex:1; min-width:0; }
+.resource-permission-toolbar .moki-ui-input { width:100%; }
+.resource-permission-tree { min-height:180px; max-height:48dvh; }
+.resource-permission-empty { padding:40px 16px; text-align:center; color:var(--moki-text-muted); }
+.resource-permission-more { margin:12px; }
+@media(max-width:560px) { .resource-permission-toolbar { flex-wrap:wrap; } .resource-permission-toolbar > label { min-width:160px; } }

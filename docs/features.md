@@ -14,6 +14,14 @@ MOKI Library connects **find → preview → select → collaborate → review a
 | 多文件并行 / Work across files | 侧边工作区多标签、独立预览窗口、跨屏查看 / Side-workspace tabs and separate preview windows |
 | 接入对话 / Attach library items | 可选开启附件选择器和任务文件自动映射 / Optional attachment picker and automatic task-file mapping |
 
+## 完整工作区 / Full workspace
+
+![DSH 完整界面中的资料库和会话引用 / Full DSH interface with library selections referenced in the conversation input](media/dsh-workspace.png)
+
+在右侧资料库勾选「项目排期.xlsx」和「产品介绍.docx」，点击「选区加入对话」，再在左侧输入要求。图中可同时看到 DSH 导航、资料库文件列表、已选状态和原生输入框中的引用。使用本机 DSH Web 与新建演示资料实拍，输入内容尚未发送。[卡片模式版本](media/dsh-workspace-cards.png)。
+
+Select the two demo files in the right-hand library, choose **Add selection to conversation**, then describe the task on the left. The capture includes DSH navigation, the library, selected files and the native composer reference. Captured from local DSH Web with purpose-made files and an unsent draft. [Card-view alternative](media/dsh-workspace-cards.png).
+
 ## 从整理到保存 / From organization to saving
 
 先将本地文件、文件夹和参考链接加入资料库，用虚拟目录与标签组织项目，再通过搜索定位。列表适合查看名称、类型与时间，卡片和缩略图气泡适合浏览视觉素材。路径栏可粘贴路径，空目录支持拖拽添加，Windows 还可将选中文件拖到其他应用或复制后粘贴。

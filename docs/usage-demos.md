@@ -17,6 +17,17 @@ These are step-by-step examples you can follow. Screenshots contain purpose-made
 
 Mapping normally preserves the file's existing location. Dropping into a mapped local folder copies files into that disk directory. Attaching a complete file is separate from supplying a selected passage; each attachment is limited to 32 MB.
 
+### Reference selected library items beside the conversation
+
+![Full DSH workspace: two selected files and their native reference in the composer](media/dsh-workspace.png)
+
+1. Choose **Side workspace** from the library toolbar to keep the library beside the conversation.
+2. Select the checkboxes for the files to discuss. This example uses “项目排期.xlsx” and “产品介绍.docx”.
+3. Click **Add selection to conversation**. The toolbar changes to **Added to draft**, and a native reference appears in the DSH composer.
+4. Enter a request, for example: “Read the referenced schedule and product introduction, identify this week's key tasks and dependencies, and suggest scheduling improvements. Do not modify the source files yet.” Check the reference and choose your configured model before sending.
+
+This is an actual local DSH Web capture with demonstration files and an unsent draft. A library-item reference lets DSH tools locate the selected items; it is distinct from uploading complete files with **Add attachments**. The same selection is also shown in [card view](media/dsh-workspace-cards.png).
+
 ## 2. Excel: change only C2:C6
 
 ![C2:C6 selected in the demonstration schedule](media/raw/excel-editor.png)

@@ -24,6 +24,10 @@ Move from finding a file to reading, selecting, editing and saving it in one wor
 - **Connect files to conversations.** Optionally add a library attachment picker above the composer and automatically map newly created DSH task files.
 - **Keep context compact.** Selection references carry bounded content and exact locations. Supported edits use `context → edit_selection`; complex edits can use the Office tools.
 
+![Full DSH interface with MOKI Library beside the conversation and two selected files referenced in the composer](docs/media/dsh-workspace.png)
+
+**Library and conversation in one window.** In this actual local DSH Web capture, “项目排期.xlsx” and “产品介绍.docx” are selected in the side workspace. **Add selection to conversation** places a native reference in the composer, followed by the user's request. The files are demonstration data and the input is an unsent draft. [Card-view alternative](docs/media/dsh-workspace-cards.png).
+
 ![Library in list and card views, using public demonstration files](docs/media/library.png)
 
 ![Selection collaboration and editing, using public demonstration files](docs/media/editing.png)

@@ -24,6 +24,10 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 - **连接对话和任务文件**：可选开启资料库附件选择入口；自动把 DSH 新建或交付的任务文件映射进资料库。
 - **精简选区传递**：只传必要的选区正文与准确位置；支持的简单修改通过 `context → edit_selection` 完成，复杂修改按需调用 Office 工具。
 
+![DSH 完整界面：右侧 MOKI 资料库选中文件，左侧对话输入框显示资料库引用与任务要求](docs/media/dsh-workspace.png)
+
+**资料库和会话并排协作。** 本机 DSH Web 完整界面实拍：右侧选中「项目排期.xlsx」与「产品介绍.docx」，点击「选区加入对话」后，左侧原生输入框显示资料库引用，再输入任务要求。画面使用演示文件，输入草稿尚未发送。[查看卡片模式版本](docs/media/dsh-workspace-cards.png)。
+
 ![列表与卡片模式，画面使用公开演示数据](docs/media/library.png)
 
 ![选区与编辑演示，画面使用公开演示数据](docs/media/editing.png)

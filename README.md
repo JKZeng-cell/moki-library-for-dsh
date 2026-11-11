@@ -4,9 +4,13 @@ English · [简体中文](README.zh-CN.md)
 
 ![MOKI Library — file management, rich previews and AI editing in DeepSeek Harness](docs/media/cover.png)
 
-**Keep your files organized. Preview them in place. Collaborate with AI on the exact selection.**
+**Bring file management into DSH. Keep AI production organized.**
 
 MOKI Library is a community plugin for **DeepSeek Harness (DSH)**. It brings a local file library, multi-format previews and Office editing into the same workspace as your DSH conversations.
+
+Move from finding a file to reading, selecting, editing and saving it in one workflow. Organize a project, then keep its documents and spreadsheets beside the conversation.
+
+[Five usage demos](docs/usage-demos.md) · [Preview and editing format support](docs/formats.md) · [Media kit](docs/social/README.md)
 
 [Download](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/latest) · [Usage guide (中文)](docs/guide.zh-CN.md) · [Features](docs/features.md) · [Report an issue](https://github.com/JKZeng-cell/moki-library-for-dsh/issues)
 
@@ -41,13 +45,51 @@ The GitHub source archive is for development; the `.tgz` release asset is the bu
 
 ## Selection collaboration
 
-1. Open a file, enter editing mode where supported, and select the text, cells or region you want to discuss.
-2. Press **Alt+D**. Use **Add selection to conversation** to include the reference in your draft and describe the change.
-3. Inspect the result in the document. Save when it is ready; changes remain in an isolated draft until saved.
+### Your first workflow
 
-Example requests: “Read the selected cells and explain the formula”, “Rewrite this paragraph while keeping its meaning”, or “Describe the selected area of this image”. Visual analysis does not imply that a binary image or PDF can be edited in place.
+1. Open **MOKI Library** from DSH's sidebar. Use **Add files** or drag files, folders and links into the content area.
+2. Organize virtual folders and tags. Search by name, tag or path, clear the search with one click, and switch between list/card views. Hover over a thumbnail for a larger preview.
+3. Open a file. By default, the main library uses separate preview windows and the side workspace opens new tabs. Settings can explicitly choose DSH's main window, a separate window or the default app.
+4. For editable formats, enter **Edit**, select the relevant content, press **Alt+D** and choose **Add selection to conversation**. Describe the task.
+5. Review the result, then **Save** or **Save as**. AI edits stay in the draft until saved. Reopen the file to check persistence.
+
+### Practical examples
+
+| Task | Select first | Example prompt and check |
+| --- | --- | --- |
+| Excel schedule | `C2:C6` on the intended sheet | “Increase each selected planned-day value by 1; preserve other cells and styles.” Inspect, save and reopen |
+| Word / text revision | A passage | “Make this more concise, preserving facts and proper names. Change only the selected range.” Check context and styles |
+| PowerPoint heading | Highlighted text inside the intended text box | “Replace with ‘Review before saving’; preserve the box position and font size.” Check wrapping and layout |
+| PDF reading | Text on the relevant page | “Explain this passage, identify its page and list conditions I should verify.” Read-only analysis |
+| Image / scanned page | A selected region | “Describe this region and explicitly mark unreadable text.” Requires a vision-capable model |
+
+![Image-region and PDF previews](docs/media/previews.png)
+
+The [illustrated usage demos](docs/usage-demos.md) include exact steps, sample prompts, expected checks and window/workspace choices. Sample prompts are instructions, not fabricated AI transcripts.
+
+### Selections, attachments and task files
+
+**Add selection to conversation** carries selected content and its location. **Library → Add attachments** supplies selected files, after enabling the library composer button in settings. Separately, **automatic task-file mapping** collects newly created/delivered DSH files in “DSH task files” after it is enabled, deduplicating identical paths.
+
+The floating conversation uses DSH's native input, supports moving/resizing and creating/switching conversations. In a separate preview, Alt+D opens it inside that preview window.
 
 Default context text is bounded to 4,000 characters; composer quotes to 1,000. Truncation is marked. Tools can request more content when needed. Selection references are scoped to the conversation/editor, expire after ten minutes, and reject stale or reused edits.
+
+## Preview and editing formats
+
+| Category | Main formats | Preview | In-plugin editing |
+| --- | --- | --- | --- |
+| Word / Excel / PowerPoint | DOCX, XLSX, PPTX | Supported | Supported; review the draft before saving |
+| Delimited data / workspace | CSV, TSV, UNIVER | Supported | Supported; CSV/TSV do not retain workbook styling |
+| Text and code | TXT, MD, JSON, HTML, XML, YAML, JS/TS, Python and more | Supported | Listed editable extensions up to 5 MB |
+| Legacy / Apple Office | DOC, PPT, PAGES, NUMBERS, KEY | Limited content extraction | No; convert to an editable format first |
+| Images / design files | PNG, JPEG, GIF, WebP, SVG, BMP, AVIF, ICO, PSD/PSB, TGA, TIFF | Image or composite preview | No image/layer editor |
+| PDF / OFD / AI | PDF, OFD, PDF-compatible AI | Page, text or region | Reading/analysis, not source-format editing |
+| Audio / video | MP4, MOV, MKV, AVI, WebM; MP3, WAV, FLAC, AAC, OGG and more | Codec-dependent, optional FFmpeg | No media editing workflow |
+| 3D / fonts | GLB, glTF, OBJ, STL, PLY, FBX; TTF, OTF, WOFF, WOFF2 | Model controls / font samples | No model/font source editing |
+| Archives | ZIP/ZIP64, RAR5, 7z, TAR, GZ, BZ2, XZ, CAB and more | Read-only directory/search/paging | No archive-content editing |
+
+HEIC/HEIF depend on decoder availability. Legacy XLS, macro-enabled and password-protected documents are not listed as supported embedded editing formats. See the [full matrix](docs/formats.md) for extensions, sidecar resources, read-only formats and size limits. **Preview support does not imply editing support or complete fidelity for every file variant.**
 
 ## Data and limits
 

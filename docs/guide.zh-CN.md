@@ -2,6 +2,8 @@
 
 在 DSH 中管理文件、网页链接和文件夹，并与当前对话协作。适用于 DSH 桌面版 0.2.2-rc.1。插件包含资料库界面、数据库服务、Office 编辑器适配和十一组 DSH Agent 工具。
 
+第一次使用可先看[五组图文演示](usage-demos.zh-CN.md)；按扩展名查能力请看[文件预览与编辑格式支持表](formats.zh-CN.md)。
+
 ## 使用
 
 资料库工具栏的「资料库设置」和 DSH「设置 → MOKI资料库」同步保存以下选项。
@@ -40,6 +42,8 @@
 ## 文件预览与大小
 
 除已有图片、音视频、PDF、Office、文本和网页预览外，增加以下能力：
+
+内嵌编辑支持 DOCX、XLSX、PPTX、CSV、TSV、UNIVER 和所列常用文本扩展名；旧版 DOC/PPT 与 Apple Office 为有限的内容提取预览。完整扩展名、编辑能力、HEIC/HEIF 解码条件及未支持格式见[格式表](formats.zh-CN.md)。
 
 | 格式 | 预览方式 |
 | --- | --- |
@@ -84,7 +88,7 @@ Windows 默认资料库位于 `%USERPROFILE%\.dsh\moki-library`，包含资料�
 npm ci
 npm run build
 npm test
-npm pack --pack-destination artifacts
+npm pack
 ```
 
 `vendor/moki` 保留资料库、预览和编辑器所需的 MOKI 模块。DSH 导航、原生会话、工具及运行时适配在 `src`，嵌入界面与 DSH 主题适配在 `web`。

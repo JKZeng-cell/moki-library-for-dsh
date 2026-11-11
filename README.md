@@ -30,7 +30,9 @@ Move from finding a file to reading, selecting, editing and saving it in one wor
 
 ![Library in list and card views, using public demonstration files](docs/media/library.png)
 
-![Selection collaboration and editing, using public demonstration files](docs/media/editing.png)
+![Excel selection and DSH floating chat, composed from public demonstration UI captures](docs/media/editing.png)
+
+The collaboration illustration includes the DSH floating composer with a `Sheet1!C2:C6` reference and an unsent request. [Original floating-chat capture](docs/media/raw/dsh-floating-chat.png).
 
 ## Install
 

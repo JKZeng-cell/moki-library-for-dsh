@@ -30,7 +30,9 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 
 ![列表与卡片模式，画面使用公开演示数据](docs/media/library.png)
 
-![选区与编辑演示，画面使用公开演示数据](docs/media/editing.png)
+![Excel 选区与 DSH 对话浮窗，使用公开演示界面进行编排](docs/media/editing.png)
+
+协作示意图展示 DSH 浮窗中的 `Sheet1!C2:C6` 引用与待发送的修改要求。[查看原始浮窗截图](docs/media/raw/dsh-floating-chat.png)。
 
 ## 安装
 

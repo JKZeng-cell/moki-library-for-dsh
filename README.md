@@ -4,7 +4,7 @@ English · [简体中文](README.zh-CN.md)
 
 ![MOKI Library — file management, rich previews and AI editing in DeepSeek Harness](docs/media/cover.png)
 
-**Bring file management into DSH. Keep AI production organized.**
+**Give DSH a file explorer. Keep AI-generated work organized.**
 
 MOKI Library is a community plugin for **DeepSeek Harness (DSH)**. It brings a local file library, multi-format previews and Office editing into the same workspace as your DSH conversations.
 

@@ -4,7 +4,7 @@
 
 ![MOKI资料库：文件管理、多格式预览与AI协同编辑](docs/media/cover.png)
 
-**将资源管理器嵌入DSH 让AI生产井然有序**
+**给DSH加个资源管理器 让AI生成井然有序**
 
 MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管理本地文件、文件夹和链接，预览多种格式，选中内容后直接与 DSH 对话协作。
 

@@ -1,7 +1,7 @@
 # Media kit / 图文素材包
 
-- `../media/cover.png`: wide repository cover / 横版开源封面。
-- `../media/cover-portrait.png`: portrait cover / 小红书竖版封面。
+- `../media/cover.png`: wide cover with file management, editing and DSH floating chat / 包含文件管理、编辑与 DSH 浮窗的横版封面。
+- `../media/cover-portrait.png`: portrait cover with DSH floating collaboration / 包含 DSH 浮窗协作的小红书竖版封面。
 - `../media/dsh-workspace.png`: full DSH interface, library list and conversation reference / DSH 完整界面、资料库列表与会话引用输入（1600 × 900）。
 - `../media/dsh-workspace-cards.png`: full DSH interface in card mode / DSH 完整界面的卡片模式版本（1600 × 900）。
 - `../media/library.png`: file management demonstration / 文件管理演示图。
@@ -14,11 +14,11 @@
 - [Illustrated usage demos / 图文用法演示](../usage-demos.zh-CN.md) · [English](../usage-demos.md).
 - [Preview and editing formats / 预览与编辑格式](../formats.zh-CN.md) · [English](../formats.md).
 
-The r6 kit adds DSH floating chat to the Excel collaboration illustration, using a real capture of a `Sheet1!C2:C6` reference and an unsent editing request. The original floating-chat screenshot is included. The portrait cover uses a compact layered layout with matching window headers and larger visible UI content. Both covers use **给DSH加个资源管理器 让AI生成井然有序** — “Give DSH a file explorer. Keep AI-generated work organized.” Full DSH interface screenshots were captured from local DSH Web using purpose-made files and an unsent composer draft.
+The r7 kit adds DSH floating chat to both covers, showing file management, spreadsheet editing and contextual conversation together. The floating panel uses a real `Sheet1!C2:C6` reference and an unsent editing request as its source; the original capture and the separate collaboration illustration are included. Both covers use **给DSH加个资源管理器 让AI生成井然有序** — “Give DSH a file explorer. Keep AI-generated work organized.” Full DSH interface screenshots were captured from local DSH Web using purpose-made files and an unsent composer draft.
 
-r6 素材包为 Excel 协作示意图加入 DSH 对话浮窗，展示真实界面中的 `Sheet1!C2:C6` 引用与待发送的修改要求，并附原始浮窗截图。竖版封面延续紧凑叠放的界面排版。横、竖封面的副标题均为「给DSH加个资源管理器 让AI生成井然有序」。完整 DSH 界面展示图提供列表和卡片两种版本，均为本机 DSH Web 实拍，使用演示资料与未发送的输入草稿。
+r7 素材包为横版和竖版封面加入 DSH 浮窗协作框，让文件管理、表格编辑和对话协作同框展示。浮窗以实拍的 `Sheet1!C2:C6` 引用与待发送修改要求为参考，原始截图和独立协作演示图一并收录。副标题为「给DSH加个资源管理器 让AI生成井然有序」。完整 DSH 界面展示图提供列表和卡片两种版本，均为本机 DSH Web 实拍，使用演示资料与未发送的输入草稿。
 
-Download the latest [moki-library-media-kit-v0.1.58-r6.zip](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.58/moki-library-media-kit-v0.1.58-r6.zip). Earlier media archives remain available in the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58).
+Download the latest [moki-library-media-kit-v0.1.58-r7.zip](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.58/moki-library-media-kit-v0.1.58-r7.zip). Earlier media archives remain available in the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58).
 
 The covers use the title **资料库 for DSH** and subtitle **给DSH加个资源管理器 让AI生成井然有序**, with slightly tilted, layered windows giving file management and editing comparable visual weight. A smaller monochrome DSH mark sits in the footer.
 

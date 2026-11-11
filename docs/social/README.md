@@ -13,15 +13,15 @@
 - [Illustrated usage demos / 图文用法演示](../usage-demos.zh-CN.md) · [English](../usage-demos.md).
 - [Preview and editing formats / 预览与编辑格式](../formats.zh-CN.md) · [English](../formats.md).
 
-The r4 kit updates both cover subtitles to **给DSH加个资源管理器 让AI生成井然有序** — “Give DSH a file explorer. Keep AI-generated work organized.” It also includes the full DSH interface screenshots showing selected library files alongside a native conversation reference and an example request. Both interface views were captured from local DSH Web using purpose-made files and an unsent composer draft.
+The r5 kit refines the portrait cover with a compact, gently tilted stack of file-management and editing panels, matching window headers and larger visible UI content. Both covers use **给DSH加个资源管理器 让AI生成井然有序** — “Give DSH a file explorer. Keep AI-generated work organized.” The kit also includes full DSH interface screenshots showing selected library files alongside a native conversation reference and an example request. Both interface views were captured from local DSH Web using purpose-made files and an unsent composer draft.
 
-r4 素材包将横、竖封面的副标题统一更新为「给DSH加个资源管理器 让AI生成井然有序」。同时包含 DSH 完整界面展示图：右侧资料库选中文件，左侧原生输入框显示引用和示例问题；提供列表与卡片两种版本。两张均为本机 DSH Web 实拍，使用演示资料，未发送输入草稿。
+r5 素材包优化竖版封面的界面排版：文件管理和编辑窗口紧凑错位叠放，统一窗口标题栏，放大主要界面内容。横、竖封面的副标题均为「给DSH加个资源管理器 让AI生成井然有序」。同时包含 DSH 完整界面展示图：右侧资料库选中文件，左侧原生输入框显示引用和示例问题；提供列表与卡片两种版本。两张均为本机 DSH Web 实拍，使用演示资料，未发送输入草稿。
 
-Download the latest [moki-library-media-kit-v0.1.58-r4.zip](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.58/moki-library-media-kit-v0.1.58-r4.zip). Earlier media archives remain available in the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58).
+Download the latest [moki-library-media-kit-v0.1.58-r5.zip](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.58/moki-library-media-kit-v0.1.58-r5.zip). Earlier media archives remain available in the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.58).
 
-Cover revision r4 uses the title **资料库 for DSH** and subtitle **给DSH加个资源管理器 让AI生成井然有序**, with slightly tilted, layered windows giving file management and editing comparable visual weight. A smaller monochrome DSH mark sits in the footer.
+The covers use the title **资料库 for DSH** and subtitle **给DSH加个资源管理器 让AI生成井然有序**, with slightly tilted, layered windows giving file management and editing comparable visual weight. A smaller monochrome DSH mark sits in the footer.
 
-封面 r4 使用「资料库 for DSH」标题和「给DSH加个资源管理器 让AI生成井然有序」副标题，文件管理与编辑界面以接近的视觉分量倾斜叠放，DSH 标志缩小并融入页脚。素材包包含完整的中英文介绍、逐步演示和格式支持表。
+封面使用「资料库 for DSH」标题和「给DSH加个资源管理器 让AI生成井然有序」副标题，文件管理与编辑界面以接近的视觉分量倾斜叠放，DSH 标志缩小并融入页脚。素材包包含完整的中英文介绍、逐步演示和格式支持表。
 
 Raw screenshots and feature demonstrations use purpose-made sample data. Covers are promotional compositions edited from these references; use the raw screenshots and step-by-step guides when inspecting actual UI behavior. The supplied official DeepSeek Harness mark identifies the host application and is not a claim of endorsement. Do not replace demo assets with personal library screenshots when sharing.
 

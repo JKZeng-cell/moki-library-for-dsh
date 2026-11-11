@@ -62,7 +62,7 @@ npm ci
 npm run build
 npm test
 node scripts/collect-licenses.mjs
-npm pack --pack-destination artifacts
+npm pack
 ```
 
 The browser/Office tests use an installed Chrome or Edge. Tests create synthetic temporary files, never the user's library. Tests run serially to avoid competing Office runtimes. `src/` contains the DSH integration, `web/` the embedded UI, and `vendor/moki/` the required MOKI library modules.
@@ -72,5 +72,6 @@ The browser/Office tests use an installed Chrome or Edge. Tests create synthetic
 - **MIT** for MOKI's source and the included MOKI modules. Dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
 - [Contributing](CONTRIBUTING.md) · [Public-release hygiene](docs/public-release.md) · [Media kit](docs/social/README.md).
 - Discover DSH extensions through the official [`dsh-plugin` topic](https://github.com/topics/dsh-plugin) and [DeepSeek Harness Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
+- Join the [MOKI Library community discussion](https://github.com/deepseek-ai/deepseek-harness/discussions/12941) in **Show Your Plugins!**.
 
 Developed by **JKZeng / MOKI**. Contact: [GitHub Issues](https://github.com/JKZeng-cell/moki-library-for-dsh/issues). This is an independent community plugin, not an official DeepSeek product. The DeepSeek Harness logo identifies the host application and belongs to its respective owner.

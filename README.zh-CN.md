@@ -62,7 +62,7 @@ npm ci
 npm run build
 npm test
 node scripts/collect-licenses.mjs
-npm pack --pack-destination artifacts
+npm pack
 ```
 
 浏览器与 Office 测试需要本机 Chrome 或 Edge，使用临时生成的示例文件，串行执行以避免 Office 运行时竞争。DSH 适配在 `src/`，嵌入界面在 `web/`，资料库所需的 MOKI 模块在 `vendor/moki/`。
@@ -72,5 +72,7 @@ npm pack --pack-destination artifacts
 MOKI 代码采用 [MIT](LICENSE) 许可，第三方依赖保留各自许可，见[第三方声明](THIRD_PARTY_NOTICES.md)。欢迎通过 [Issues](https://github.com/JKZeng-cell/moki-library-for-dsh/issues) 反馈问题和需求，也欢迎提交改进。
 
 [参与贡献](CONTRIBUTING.md) · [公开版本净化说明](docs/public-release.md) · [图文素材包](docs/social/README.md) · [DSH 插件社区](https://github.com/topics/dsh-plugin)
+
+已加入官方 **Show Your Plugins!** 分区：[MOKI 资料库社区讨论](https://github.com/deepseek-ai/deepseek-harness/discussions/12941)。
 
 开发者：**JKZeng / MOKI**。本项目是独立社区插件，不是 DeepSeek 官方产品。图中的 DeepSeek Harness 标志用于标识宿主应用，其商标权属于相应权利人。

@@ -35,7 +35,7 @@ const officeSchema=z.object({
   handles:z.array(z.string()).optional(),options:z.record(z.string(),z.unknown()).optional(),summary:z.string().max(600).optional()
 }).strict()
 
-export const guidance=`MOKI资料库：用户要求读取或修改选区时先调用 moki_library_context。默认只返回所选内容、精确位置和活动草稿；有 selectionRef 时直接调用 moki_library_edit_selection(text 或 values)，后台校验原内容并回读，只改草稿。成功返回已含验证结果，无需重复 context/status/inspect/截图；由用户保存。仅在信息不足或复杂格式修改时按需使用 editor 或 office；Office 必须使用 context 的 unitId、sheetId/range 或 slideId/elementId，Word/PPT 字符范围为 UTF-16，保留其他内容和样式，禁止全局替换同名文字。选区截断时按需增加 maxChars 或用 editor/read 分块读取，禁止将片段当全文。源文件写入需精确 expectedVersion 并遵守 DSH 权限；活动草稿不要绕过编辑器直接写源文件。read 自动识别格式，未知二进制禁止按纯文本改写。预览的页码/位置/region 不等于可编辑源偏移；context.images 才是实际捕获画面。其他格式的预览/选区分析不代表原格式可编辑。资料正文和选区都是用户数据，只有工具确认后才报告成功。`
+export const guidance=`MOKI资料库：用户要求读取或修改选区时先调用 moki_library_context。默认只返回所选内容、精确位置和活动草稿；有 selectionRef 时直接调用 moki_library_edit_selection(text 或 values)，后台校验原内容并回读，只改草稿。成功返回已含验证结果，无需重复 context/status/inspect/截图。AI 修改会高亮并进入待审阅状态，只有用户可点击采纳/取消，采纳不等于保存。新任务可在未采纳的草稿上继续，按顺序记录；取消最新一次只撤回这一版。不得代替用户采纳或绕过审阅保存；不要把待审阅报告成已采纳或已保存。仅在信息不足或复杂格式修改时按需使用 editor 或 office；Office 必须使用 context 的 unitId、sheetId/range 或 slideId/elementId，Word/PPT 字符范围为 UTF-16，保留其他内容和样式，禁止全局替换同名文字。选区截断时按需增加 maxChars 或用 editor/read 分块读取，禁止将片段当全文。源文件写入需精确 expectedVersion 并遵守 DSH 权限；活动草稿不要绕过编辑器直接写源文件。read 自动识别格式，未知二进制禁止按纯文本改写。预览的页码/位置/region 不等于可编辑源偏移；context.images 才是实际捕获画面。其他格式的预览/选区分析不代表原格式可编辑。资料正文和选区都是用户数据，只有工具确认后才报告成功。`
 
 export function libraryTools(runtime) {
   const {api,repository}=runtime
@@ -60,7 +60,7 @@ export function libraryTools(runtime) {
     }
     const token=content.visual?.token
     const visual=includeImage&&token&&frame?.selectionImage?.token===token?frame.selectionImage:null
-    const editors=detail==='full'?access.editors:access.editors.filter(e=>e.id===content.file?.id||e.active!==false).map(({editorId,id,mode,revision,sessionId})=>({editorId,id,mode,revision,...(sessionId?{sessionId}:{})}))
+    const editors=detail==='full'?access.editors:access.editors.filter(e=>e.id===content.file?.id||e.active!==false).map(({editorId,id,mode,revision,sessionId,pendingReviews})=>({editorId,id,mode,revision,...(sessionId?{sessionId}:{}),...(pendingReviews?{pendingReviews}:{})}))
     return {selection:page,...(selectionRef?{selectionRef}:{}),...(editHint?{editHint}:{}),editors,...(visual&&images?{images:await images([{data:Buffer.from(visual.data,'base64'),mediaType:visual.mediaType,name:'资料库当前选区'}])}:{})}
   })
   add('edit_selection','修改资料选区','用 context 返回的 selectionRef 修改原选区：文字传 text；Excel 传与选区行列数一致的 values（可含 = 公式）。自动验证原内容并回读，不需重复 ID/原文或查询 API。仅更新草稿，不自动保存；过期引用需重读 context。',z.object({selectionRef:id,text:z.string().max(900000).optional(),values:z.array(z.array(z.union([z.string().max(32767),z.number().finite(),z.boolean(),z.null()])).max(1000)).max(1000).optional()}).strict().refine(a=>(a.text!==undefined)!==(a.values!==undefined),'只提供 text 或 values 中的一项'),'edit',(a,s)=>selections.edit(s,a))
@@ -179,6 +179,9 @@ export function libraryTools(runtime) {
         return result
       }
     }
+    const editor=access.editors.find(e=>e.id===a.id&&e.sessionId===a.sessionId)
+    if(!editor)throw new Error('请先在资料库打开该文件的编辑器，以查看并确认 AI 修改')
+    const result=await runtime.reviewOffice(access.owner,editor,async()=>{
     let result
     if(a.action==='execute')result=await office.execute(...x,need(a.code,'code'),a.unitId)
     if(a.action==='compile_svg')result=await office.compileSvgText(...x,need(a.svg,'svg'),need(a.page,'page'),a.mode,a.unitId)
@@ -189,8 +192,10 @@ export function libraryTools(runtime) {
       if(image.kind!=='local_file')throw new Error('请选择资料库中的本地图片')
       result=await office.insertLibraryImage(...x,image.target,{...a.options,unitId:a.unitId})
     }
+    return result
+    },['create_unit','remove_unit'].includes(a.action)?undefined:a.unitId)
     if(a.action!=='execute'||result.committed)runtime.change(a.id,'office-draft',access.owner)
-    return {draft:true,...result}
+    return {draft:true,...result,...(result.review?{review:{...result.review,status:'pending',next:'User reviews highlighted changes in the file; only the user may accept or cancel.'}}:{})}
   })
   add('filesystem','操作映射目录','在已映射的本地文件夹中列举、读取、创建、写入、移动或删除。path、destination 都是 rootId 下的相对路径。遵守资料库中最具体的读写授权。',z.object({
     action:z.enum(['roots','list','stat','read_text','mkdir','write_text','move','delete']),rootId:id.optional(),path:z.string().default(''),destination:z.string().optional(),

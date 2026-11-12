@@ -1,12 +1,15 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
+import {installOfficeReview} from './office-review-viewer.js';
+export const officeReviewSource=installOfficeReview.toString();
 
 export async function patchViewer(artifacts) {
 const viewerPath = join(artifacts,"viewer/index.html");
 const startMarker = "<!-- moki-univer-bridge:start -->";
 const endMarker = "<!-- moki-univer-bridge:end -->";
 const injection = `${startMarker}
+    <script>(${officeReviewSource})();</script>
     <style>
       html[data-dsh-theme] { color-scheme: var(--moki-scheme) !important; }
       html[data-dsh-theme] [role="toolbar"] { background-color:var(--moki-toolbar)!important; border-color:var(--moki-border)!important; }

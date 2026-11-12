@@ -27,7 +27,7 @@ export function useWorkspaceEditor(enabled: boolean, state: Omit<WorkspaceEditor
       try {
         const latest = current.current;
         if (closed || command.id !== latest.state.id || command.editorId !== editorId || command.expiresAt <= Date.now()) throw new Error(uiText("预览已关闭、切换或操作已过期"));
-        if (command.revision !== undefined && command.revision !== latest.state.revision) throw new Error(uiText("草稿已变化，请重新确认操作"));
+        if ('revision' in command && command.revision !== undefined && command.revision !== latest.state.revision) throw new Error(uiText("草稿已变化，请重新确认操作"));
         result = await latest.execute(command);
       } catch (error) { result = { status:'failed', message: error instanceof Error ? error.message : uiText("编辑器操作失败") }; }
       // Publish the committed mode/revision before releasing the waiting assistant.

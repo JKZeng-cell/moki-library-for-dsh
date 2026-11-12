@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { WorkspaceEditorAction, WorkspaceEditorCommand, WorkspaceEditorResult, WorkspaceEditorState } from '../../shared/workspace-editor-contract.js';
+import type { WorkspaceEditorAction, WorkspaceEditorCommand, WorkspaceEditorResult, WorkspaceEditorState, WorkspaceReviewControl } from '../../shared/workspace-editor-contract.js';
 
 /** The mounted preview owns its draft. Commands must be acknowledged by that exact instance. */
 export class WorkspaceEditorBridge {
@@ -21,10 +21,10 @@ export class WorkspaceEditorBridge {
     if (!state) throw new Error('目标预览已关闭或切换，请重新读取侧边工作区状态');
     return state;
   }
-  request(input: WorkspaceEditorAction): Promise<WorkspaceEditorResult> {
+  request(input: WorkspaceEditorAction | WorkspaceReviewControl): Promise<WorkspaceEditorResult> {
     const state = this.require(input);
-    if (!state.operations.includes(input.operation)) throw new Error('当前文件或编辑状态不支持此操作');
-    if (input.revision !== undefined && input.revision !== state.revision) throw new Error('草稿已变化，请重新生成操作预览');
+    if (input.operation!=='review_control' && !state.operations.includes(input.operation)) throw new Error('当前文件或编辑状态不支持此操作');
+    if ('revision' in input && input.revision !== undefined && input.revision !== state.revision) throw new Error('草稿已变化，请重新生成操作预览');
     if ([...this.pending.values()].some(entry => entry.command.editorId === input.editorId)) throw new Error('该编辑器已有操作正在进行');
     const command = { ...input, requestId: randomUUID(), expiresAt: this.now() + this.timeoutMs };
     return new Promise(resolve => {

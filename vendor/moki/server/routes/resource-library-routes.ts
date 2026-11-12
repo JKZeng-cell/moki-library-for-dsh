@@ -1007,20 +1007,30 @@ export async function registerResourceLibraryRoutes(
     const params=paramsSchema.parse(request.params), item=options.repository.find(params.id);
     if (!item?.target || item.kind !== 'local_file') return reply.code(404).send({error:'文件不存在'});
     const draft=await textDrafts().get('text:'+item.id);
-    return {draft: draft?.sourcePath === item.target ? {content:draft.content.toString('utf8'),version:draft.version,savedAt:draft.savedAt} : null};
+    return {draft: draft?.sourcePath === item.target ? {content:draft.content.toString('utf8'),version:draft.version,savedAt:draft.savedAt,review:draft.review} : null};
   });
   app.put('/api/library/items/:id/draft', async (request, reply) => {
     const params=paramsSchema.parse(request.params), item=options.repository.find(params.id);
-    const input=z.object({content:z.string().max(5_000_000),version:z.string().optional()}).parse(request.body);
+    const input=z.object({content:z.string().max(5_000_000),version:z.string().optional(),review:z.array(z.object({id:z.string().uuid(),sequence:z.number().int().positive(),createdAt:z.string(),before:z.string().max(5_000_000)})).max(20).optional()}).parse(request.body);
     if (!item?.target || item.kind !== 'local_file' || !EDITABLE_TEXT_EXTENSIONS.has(extname(item.target).toLowerCase())) return reply.code(415).send({error:'文件不支持文本草稿'});
     if (Buffer.byteLength(input.content)>5_000_000) return reply.code(413).send({error:'草稿超过 5MB'});
-    return textDrafts().put('text:'+item.id,Buffer.from(input.content),{sourcePath:item.target,...(input.version ? {version:input.version}: {})});
+    return textDrafts().put('text:'+item.id,Buffer.from(input.content),{sourcePath:item.target,...(input.version ? {version:input.version}: {}),...(input.review?{review:input.review}:{})});
   });
   app.delete('/api/library/items/:id/draft', async request => {const {id}=paramsSchema.parse(request.params);await textDrafts().remove('text:'+id);return {removed:true};});
   app.post('/api/library/items/:id/univer-session/:sessionId/checkpoint', async (request, reply) => {
     const params=officeSessionParamsSchema.parse(request.params);
     if (!univerOffice) return reply.code(503).send({error:'Office 运行时不可用'});
     try {return await univerOffice.checkpoint(params.sessionId,params.id);} catch(error){return reply.code(409).send({error:String(error)});}
+  });
+  app.get('/api/library/items/:id/univer-session/:sessionId/review', async request => {
+    const {id,sessionId}=officeSessionParamsSchema.parse(request.params);
+    const result=await univerOffice!.reviewStatus(sessionId,id);
+    return (request.query as {after?:string})?.after===result.stamp?{unchanged:true,stamp:result.stamp}:result;
+  });
+  app.post('/api/library/items/:id/univer-session/:sessionId/review', async request => {
+    const {id,sessionId}=officeSessionParamsSchema.parse(request.params);
+    const {action,expectedId}=z.object({action:z.enum(['accept','reject']),expectedId:z.string().uuid()}).parse(request.body);
+    return univerOffice!.resolveReview(sessionId,id,action,expectedId);
   });
   app.post('/api/library/items/:id/univer-session/:sessionId/images', async (request, reply) => {
     const params = officeSessionParamsSchema.safeParse(request.params);

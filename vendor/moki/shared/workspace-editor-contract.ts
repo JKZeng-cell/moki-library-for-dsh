@@ -11,6 +11,8 @@ export const WorkspaceEditorStateSchema = z.object({
   mode: z.enum(['preview', 'text', 'office', 'workspace']),
   sessionId: z.string().optional(),
   dirty: z.boolean(),
+  reviewCapable: z.boolean().optional(),
+  pendingReviews: z.number().int().nonnegative().optional(),
   revision: z.number().int().nonnegative(),
   operations: z.array(WorkspaceEditorOperationSchema),
 });
@@ -40,8 +42,10 @@ export const WorkspaceEditorResultSchema = z.object({
   sessionId: z.string().optional(),
   path: z.string().max(4096).optional(),
   content: z.string().max(5_000_000).optional(),
+  review: z.object({id:z.string(),pending:z.number().int().nonnegative()}).optional(),
 });
 export type WorkspaceEditorState = z.infer<typeof WorkspaceEditorStateSchema>;
 export type WorkspaceEditorAction = z.infer<typeof WorkspaceEditorActionSchema>;
 export type WorkspaceEditorResult = z.infer<typeof WorkspaceEditorResultSchema>;
-export type WorkspaceEditorCommand = WorkspaceEditorAction & { requestId: string; expiresAt: number };
+export type WorkspaceReviewControl = {editorId:string;id:string;operation:'review_control';phase:'prepare'|'refresh'};
+export type WorkspaceEditorCommand = (WorkspaceEditorAction | WorkspaceReviewControl) & { requestId: string; expiresAt: number };

@@ -85,6 +85,18 @@ export async function createRuntime(config={}) {
     changes.push({version:++version,itemId,operation,owner})
     if (changes.length>256) changes.shift()
   }
+  async function reviewOffice(owner,editor,operation,unitId) {
+    const bridge=session(owner).editors;
+    if(editor?.reviewCapable) {
+      const prepared=await bridge.request({editorId:editor.editorId,id:editor.id,operation:'review_control',phase:'prepare'});
+      if(prepared.status!=='completed')throw new Error(prepared.message);
+    }
+    try { return await (await office(owner)).reviewedEdit(editor.sessionId,editor.id,operation,unitId); }
+    finally {
+      change(editor.id,'office-draft',owner);
+      if(editor?.reviewCapable)await bridge.request({editorId:editor.editorId,id:editor.id,operation:'review_control',phase:'refresh'}).catch(()=>undefined);
+    }
+  }
   const makeFrame=(sessionId,parentOrigin,internal=false)=>{
     const key=randomBytes(24).toString('hex')
     const frame={key,sessionId,parentOrigin,internal,lastSeen:Date.now(),seq:-1,selection:null}
@@ -241,7 +253,7 @@ export async function createRuntime(config={}) {
     const editors=session(owner).editors.list().filter(editor=>!shared || (editor.active!==false && editor.id===frame.previewId))
     return {owner,shared,editors}
   }
-  const runtime={db,repository,session,office,api,change,active,collaboration,dataDir,appUrl,previews,taskFiles,
+  const runtime={db,repository,session,office,api,change,active,collaboration,dataDir,appUrl,previews,taskFiles,reviewOffice,
     async picker(request) {
       if (!option(config,'composerPicker')) return Response.json({error:'资料库对话组件已关闭'},{status:403})
       const params=new URL(request.url).searchParams, id=params.get('file')

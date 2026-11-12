@@ -1,6 +1,6 @@
 {
   "name": "dsh-moki-library",
-  "version": "0.1.61",
+  "version": "0.1.62",
   "type": "module",
   "description": "MOKI Library for DSH: local file management, rich previews, Office editing and precise AI selection collaboration.",
   "author": "MOKI",

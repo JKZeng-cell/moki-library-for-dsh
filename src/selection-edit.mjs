@@ -121,17 +121,17 @@ export function selectionEdits(runtime){
         if(text===undefined||values!==undefined)throw Error('文字选区需要 text')
         result=await runtime.session(access.owner).editors.request({editorId:current.editorId,id:current.id,revision:current.revision,operation:'replace_range',range:{start:snapshot.start,end:snapshot.end,expectedText:snapshot.expectedText},content:text})
         if(result.status!=='completed')throw Error(result.message)
-        result={text,location:{start:snapshot.start,end:snapshot.start+text.length}}
+        result={text,location:{start:snapshot.start,end:snapshot.start+text.length},review:result.review}
       }else{
         if((snapshot.target.kind==='sheet')!==(values!==undefined)||snapshot.target.kind!=='sheet'&&text===undefined)throw Error('Excel 需要 values；文字选区需要 text')
         const office=await runtime.office(access.owner)
-        const applied=await office.execute(current.sessionId,current.id,code(snapshot.target,{guard:snapshot.guard,expectedText:snapshot.expectedText,text,values}),snapshot.target.unitId)
+        const applied=await runtime.reviewOffice(access.owner,current,()=>office.execute(current.sessionId,current.id,code(snapshot.target,{guard:snapshot.guard,expectedText:snapshot.expectedText,text,values}),snapshot.target.unitId),snapshot.target.unitId)
         if(applied.committed)runtime.change(current.id,'office-draft',access.owner)
-        result={...applied.value,revision:applied.revision}
+        result={...applied.value,revision:applied.revision,review:applied.review}
       }
       snapshots.delete(selectionRef)
       // The caller already sent the replacement; do not echo a large payload.
-      const response={status:'completed',saved:false,verified:true,location:result.location,...(result.revision!==undefined?{revision:result.revision}:{})}
+      const response={status:'completed',saved:false,verified:true,...(result.review?{review:{...result.review,status:'pending',next:'User reviews highlighted changes in the file. Do not accept or save on their behalf.'}}:{}),location:result.location,...(result.revision!==undefined?{revision:result.revision}:{})}
       if(result.text!==undefined){response.text=result.text.slice(0,1000);if(result.text.length>1000)response.truncated=true}
       if(result.values){response.cells=result.values.reduce((n,row)=>n+row.length,0);if(JSON.stringify([result.values,result.formulas]).length<=2000){response.values=result.values;if(result.formulas.some(row=>row.some(Boolean)))response.formulas=result.formulas}}
       return response

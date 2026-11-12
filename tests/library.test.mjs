@@ -346,7 +346,7 @@ test('switching the floating chat grants only the visible draft and rejects stal
 })
 
 function checkSheetShortcut(html) {
-  const source=html.split('<!-- moki-univer-bridge:start -->')[1].match(/<script>([\s\S]*?)<\/script>/)[1]
+  const source=[...html.split('<!-- moki-univer-bridge:start -->')[1].matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match=>match[1]).find(script=>script.includes('moki:univer-compose-shortcut'))
   const range={getRange:()=>({startRow:2,endRow:2,startColumn:1,endColumn:2}),getA1Notation:()=>'B3:C3'}
   const sheet={getSheetId:()=>'s1',getSheetName:()=>'预算',getActiveRange:()=>range,getSelection:()=>({getActiveRangeList:()=>[range]})}
   const workbook={getId:()=>'book',getActiveSheet:()=>sheet}

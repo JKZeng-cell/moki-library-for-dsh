@@ -1,7 +1,10 @@
 import { EditorDraftStore } from "./editor-draft-store.js";
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { DatabaseSync, backup } from 'node:sqlite';
+import { officeChanges } from '../../../src/edit-review.js';
 import { assertOfficeExport, inspectOfficeQuality } from './office-quality.js';
 import { withFileEdit } from "./file-edit-guard.js";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
@@ -269,6 +272,13 @@ type RuntimeSession = UniverOfficeSession & {
   sourceModifiedMs: number;
   merged: boolean;
   hasChanges: boolean;
+  review?: { entries: OfficeReviewEntry[]; sequence: number; baselineFile?:string };
+};
+type OfficeReviewEntry = {
+  id: string; sequence: number; createdAt: string; snapshot: string;
+  unitId: string; units?: UniverUnitSummary[]; hasChanges: boolean;
+  heads: string; count: number; changes: JsonRecord[]; truncated?: boolean;
+  highlights: JsonRecord[];
 };
 
 export function univerOfficeFileType(path: string): {
@@ -387,6 +397,8 @@ export class UniverOfficeRuntime {
   private readonly service: GatewayUniverService;
   private readonly sessions = new Map<string, RuntimeSession>();
   private readonly stateDirectory: string;
+  private readonly sessionScope = new AsyncLocalStorage<string>();
+  private readonly reviewBusy = new Set<string>();
 
   constructor(stateDirectory: string, options: { gatewayPort?: number } = {}) {
     this.stateDirectory = resolve(stateDirectory);
@@ -403,10 +415,11 @@ export class UniverOfficeRuntime {
    * Different drafts remain independent; a failed operation does not poison the queue.
    */
   private inSession<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
+    if (this.sessionScope.getStore() === sessionId) return operation();
     let queues = sessionQueues.get(this);
     if (!queues) { queues = new Map(); sessionQueues.set(this, queues); }
     const previous = queues.get(sessionId) ?? Promise.resolve();
-    const result = previous.then(operation);
+    const result = previous.then(() => this.sessionScope.run(sessionId, operation));
     const settled = result.then(() => undefined, () => undefined);
     queues.set(sessionId, settled);
     void settled.then(() => { if (queues.get(sessionId) === settled) queues.delete(sessionId); });
@@ -441,13 +454,18 @@ export class UniverOfficeRuntime {
     if (recovery) {
       const restoreDirectory = join(this.stateDirectory, 'office-recovery', randomUUID());
       await mkdir(restoreDirectory, {recursive:true});
-      importSource = join(restoreDirectory, basename(canonicalSource));
+      importSource = join(restoreDirectory, recovery.nativeWorktreeId ? 'document.univer' : basename(canonicalSource));
       await writeFile(importSource, recovery.content);
     }
-    if (extname(canonicalSource).toLowerCase() === ".univer") {
+    if (extname(canonicalSource).toLowerCase() === ".univer" || recovery?.nativeWorktreeId) {
       const opened = await this.openNative(itemId, importSource, recovery?.sourceSize ?? source.size, recovery?.sourceModifiedMs ?? source.mtimeMs, displayName, recovery?.nativeWorktreeId);
-      this.requireSession(opened.sessionId).sourcePath = canonicalSource;
-      return {...opened,sourcePath:canonicalSource};
+      const restored = this.requireSession(opened.sessionId);
+      restored.sourcePath = canonicalSource;
+      if (extname(canonicalSource).toLowerCase() !== '.univer') {
+        Object.assign(restored, univerOfficeFileType(canonicalSource), {sourceFormat:'office'});
+      }
+      if (recovery?.review) restored.review = recovery.review as RuntimeSession['review'];
+      return {...opened,kind:restored.kind,sourcePath:canonicalSource};
     }
     const { unitType, unitKind, kind } = univerOfficeFileType(canonicalSource);
     const sessionId = randomUUID();
@@ -690,22 +708,134 @@ return { applied };`,
   }
 
   private draftStore() { return new EditorDraftStore(join(this.stateDirectory, 'editor-drafts')); }
+  private async copyReviewSnapshot(source: string, destination: string) {
+    // SQLite's online backup includes WAL pages and embedded assets atomically.
+    const database = new DatabaseSync(source, {readOnly:true});
+    try { await backup(database, destination); } finally { database.close(); }
+  }
+  private async reviewHeads(session: RuntimeSession): Promise<string> {
+    const state = operationResult(await this.service.status({workspace:session.workspace,file:session.univerPath,worktreeId:session.worktreeId}), 'Office 审阅版本');
+    return JSON.stringify((state.selectedWorktree as JsonRecord)?.units);
+  }
+  private async reviewData(session: RuntimeSession, unitId?: string) {
+    const units = await this.refreshUnits(session), result = new Map<string,{kind:string;data:unknown}>();
+    for (const unit of units.filter(unit => !unitId || unit.unitId === unitId)) {
+      const method = unit.kind === 'doc' ? 'getActiveDocument' : unit.kind === 'sheet' ? 'getActiveWorkbook' : unit.kind === 'slide' ? 'getActivePresentation' : undefined;
+      if (!method) { result.set(unit.unitId,{kind:unit.kind||'workspace',data:{unitId:unit.unitId,name:unit.name}}); continue; }
+      const snapshot = await this.execute(session.sessionId,session.itemId,`return univerAPI.${method}().save();`,unit.unitId);
+      result.set(unit.unitId,{kind:unit.kind!,data:snapshot.value});
+    }
+    return result;
+  }
+  reviewStatus(sessionId: string, itemId: string) {
+    const session = this.requireSession(sessionId,itemId);
+    const busy=this.reviewBusy.has(sessionId),stamp=createHash('sha256').update(JSON.stringify([session.viewerUrl,busy,session.review?.entries.map(entry=>entry.id)])).digest('hex');
+    return { stamp,busy, session:{sessionId,itemId,viewerUrl:session.viewerUrl,unitId:session.unitId,kind:session.kind,units:session.units},
+      highlights:session.review?.entries.at(-1)?.highlights||[],
+      entries:(session.review?.entries||[]).map(({snapshot,heads,hasChanges,units,highlights,...entry})=>entry) };
+  }
+  /** One local checkpoint per AI write; later tasks build on the pending draft. */
+  async reviewedEdit<T>(sessionId:string,itemId:string,operation:()=>Promise<T>,unitId?:string):Promise<T & {review?:{id:string;pending:number}}> {
+    return this.inSession(sessionId,async()=>{
+      const session=this.requireEditableSession(sessionId,itemId);
+      const review=session.review ??= {entries:[],sequence:0};
+      if(review.entries.length>=20)throw new Error('已有 20 次待确认修改，请先在文件中采纳或取消');
+      this.reviewBusy.add(sessionId);
+      let snapshot:string|undefined;
+      try {
+        const before=await this.reviewData(session,unitId),beforeHeads=await this.reviewHeads(session);
+        const directory=join(this.stateDirectory,'edit-reviews');await mkdir(directory,{recursive:true});
+        const id=randomUUID();snapshot=join(directory,id+'.univer');
+        await this.copyReviewSnapshot(session.univerPath,snapshot);
+        const previous={unitId:session.unitId,units:structuredClone(session.units),hasChanges:session.hasChanges};
+        let result:T, failure:unknown;
+        try { result=await operation(); } catch(error) {failure=error;}
+        const heads=await this.reviewHeads(session);
+        if(heads===beforeHeads) { await rm(snapshot,{force:true}); if(failure)throw failure; return result!; }
+        const after=await this.reviewData(session,unitId);let changes:JsonRecord[]=[],count=0;
+        const first=review.entries.length===0;
+        const baselineFile=first?join(directory,id+'-baseline.json'):review.baselineFile!;
+        const baselines:Record<string,{kind:string;data?:unknown}>=first?{}:JSON.parse(await readFile(baselineFile,'utf8'));
+        const changedUnits=new Set([...before.keys(),...after.keys()]);
+        const highlights:JsonRecord[]=review.entries.at(-1)?.highlights.filter(change=>!changedUnits.has(String(change.unitId)))||[];
+        for(const key of new Set([...before.keys(),...after.keys()])) {
+          const diff=officeChanges(before.get(key)?.data,after.get(key)?.data,key,(after.get(key)||before.get(key))!.kind);
+          count+=diff.count;changes.push(...diff.changes);
+          baselines[key]??={kind:(after.get(key)||before.get(key))!.kind,data:before.get(key)?.data};
+          highlights.push(...officeChanges(baselines[key].data,after.get(key)?.data,key,baselines[key].kind).changes);
+        }
+        await writeFile(baselineFile,JSON.stringify(baselines));review.baselineFile=baselineFile;
+        if(!count){count=1;changes=[{kind:'workspace',unitId:unitId||session.unitId,structural:true}];}
+        review.entries.push({id,sequence:++review.sequence,createdAt:new Date().toISOString(),snapshot,...previous,heads:await this.reviewHeads(session),count,changes:changes.slice(0,500),highlights:highlights.slice(0,1000),truncated:count>500});
+        session.hasChanges=true;
+        await this.checkpoint(sessionId,itemId);
+        if(failure)throw new Error(`本次操作部分完成，已保留待审阅版本，可取消本次修改：${String(failure)}`);
+        return {...result!,review:{id,pending:review.entries.length}};
+      } finally {
+        this.reviewBusy.delete(sessionId);
+        if(snapshot&&!review.entries.some(entry=>entry.snapshot===snapshot))await rm(snapshot,{force:true}).catch(()=>undefined);
+      }
+    });
+  }
+  async resolveReview(sessionId:string,itemId:string,action:'accept'|'reject',expectedId:string) {
+    return this.inSession(sessionId,async()=>{
+      const session=this.requireEditableSession(sessionId,itemId),review=session.review,latest=review?.entries.at(-1);
+      if(!latest || latest.id!==expectedId)throw new Error('待确认版本已变化，请查看最新修改后再操作');
+      const previous={...session,review:structuredClone(review)};
+      this.reviewBusy.add(sessionId);
+      try {
+        const released=action==='accept'?review!.entries.map(entry=>entry.snapshot):[latest.snapshot];
+        if(action==='reject') {
+          if(await this.reviewHeads(session)!==latest.heads)throw new Error('待确认内容又被手动修改，已保留当前内容；请先采纳当前版本，避免取消时覆盖您的修改');
+          const targetDirectory=join(this.stateDirectory,'univer-office-sessions',randomUUID());await mkdir(targetDirectory,{recursive:true});
+          const directory=await realpath(targetDirectory);
+          const restored=join(directory,'document.univer');await this.copyReviewSnapshot(latest.snapshot,restored);
+          const state=asRecord(await this.service.fileState({workspace:directory,file:restored}), 'Office 审阅恢复');
+          const viewerUrl=editableWorktreeViewerUrl(state,session.worktreeId,latest.unitId);
+          Object.assign(session,{workspace:directory,univerPath:restored,viewerUrl,unitId:latest.unitId,units:latest.units,hasChanges:latest.hasChanges});
+          review!.entries.pop();
+        } else review!.entries=[];
+        if(!review!.entries.length && review!.baselineFile){released.push(review!.baselineFile);delete review!.baselineFile;}
+        // Persist the decision and snapshot together before acknowledging it.
+        await this.checkpoint(sessionId,itemId);
+        await this.removeReviewFiles(released);
+        return this.reviewStatus(sessionId,itemId);
+      } catch(error) {
+        // A decision is acknowledged only after its immutable draft manifest is
+        // committed. Keep the previous review available if persistence failed.
+        Object.assign(session,previous);
+        throw error;
+      } finally {this.reviewBusy.delete(sessionId);}
+    });
+  }
+  private assertReviewed(session:RuntimeSession) {
+    if(session.review?.entries.length)throw new Error('请先采纳或取消 AI 修改，再保存文件');
+  }
+  private async removeReviewFiles(files:string[]) {
+    const root=resolve(this.stateDirectory,'edit-reviews');
+    for(const file of files)if(dirname(resolve(file))===root)await rm(file,{force:true}).catch(()=>undefined);
+  }
   private scheduleCheckpoint(sessionId: string) {
     if (!this.stateDirectory) return;
     const session = this.sessions.get(sessionId);
     if (session) session.hasChanges = true;
     let timers=checkpointTimers.get(this);if(!timers){timers=new Map();checkpointTimers.set(this,timers);}
     clearTimeout(timers.get(sessionId));
-    timers.set(sessionId,setTimeout(()=>{timers.delete(sessionId);void this.checkpoint(sessionId).catch(()=>undefined);},1500));
+    timers.set(sessionId,setTimeout(()=>{timers.delete(sessionId);this.sessionScope.exit(()=>{void this.checkpoint(sessionId).catch(()=>undefined);});},1500));
   }
   async checkpoint(sessionId: string, itemId?: string): Promise<{savedAt:string}> {
     return this.inSession(sessionId,async()=>{
       const session=this.requireSession(sessionId,itemId);
       session.hasChanges = true;
-      const exported=await this.exportDraftInSession(sessionId,session.itemId);
+      // Keep native IDs, rich text, drawings and pending review checkpoints exact
+      // across restart, including OOXML files that normally checkpoint via export.
+      const native=Boolean(session.review);
+      const exported=native?{path:join(session.workspace,randomUUID()+'.univer')}:await this.exportDraftInSession(sessionId,session.itemId);
+      if(native)await this.copyReviewSnapshot(session.univerPath,exported.path);
       try {return await this.draftStore().put('office:'+session.itemId,await readFile(exported.path),{
         sourcePath:session.sourcePath,sourceSize:session.sourceSize,sourceModifiedMs:session.sourceModifiedMs,
-        ...(session.sourceFormat==='univer'?{nativeWorktreeId:session.worktreeId}:{}),
+        ...(session.sourceFormat==='univer'||native?{nativeWorktreeId:session.worktreeId}:{}),
+        ...(session.review?{review:session.review}:{}),
       });} finally {await rm(exported.path,{force:true});}
     });
   }
@@ -713,11 +843,13 @@ return { applied };`,
     clearTimeout(checkpointTimers.get(this)?.get(session.sessionId));
     checkpointTimers.get(this)?.delete(session.sessionId);
     if(this.stateDirectory) await this.draftStore().remove('office:'+session.itemId);
+    if(session.review)await this.removeReviewFiles([...session.review.entries.map(entry=>entry.snapshot),...(session.review.baselineFile?[session.review.baselineFile]:[])]);
   }
 
   async save(sessionId: string, itemId?: string): Promise<{ size: number; updatedAt: string }> {
     return this.inSession(sessionId, async () => {
       const session = this.requireSession(sessionId, itemId);
+      this.assertReviewed(session);
       return withFileEdit(session.sourcePath, undefined, async () => {
         await this.assertSourceUnchanged(session);
         if (session.sourceFormat === "univer") {
@@ -763,6 +895,7 @@ return { applied };`,
   ): Promise<{ path: string; size: number; updatedAt: string }> {
     return this.inSession(sessionId, async () => {
       const session = this.requireSession(sessionId, itemId);
+      this.assertReviewed(session);
       const resolvedDestination = resolve(destination);
       if (resolvedDestination.toLowerCase() === resolve(session.sourcePath).toLowerCase()) {
         throw new Error('另存为不能覆盖原文件，请使用保存操作或选择其他路径');
@@ -926,7 +1059,7 @@ return (body.paragraphs ?? []).flatMap((paragraph, paragraphIndex) => {
         unitId: unit.unitId,
         code,
       }), "Univer 代码执行");
-      this.scheduleCheckpoint(sessionId);
+      if (result.committed === true) this.scheduleCheckpoint(sessionId);
       return {
         committed: result.committed === true,
         ...(typeof result.revision === "number" ? { revision: result.revision } : {}),

@@ -43,7 +43,8 @@ test('direct Office selection edits validate snapshots, preserve exact occurrenc
       return edits.capture(owner,runtime.active(owner),data,[currentEditor])
     }
     const save=()=>runtime.api(owner,'POST',`/api/library/items/${item.id}/univer-session/${session.sessionId}/save`,{})
-    return {item,session,exec,select,save}
+    const accept=()=>office.resolveReview(session.sessionId,item.id,'accept',office.reviewStatus(session.sessionId,item.id).entries.at(-1).id)
+    return {item,session,exec,select,save,accept}
   }
   const doc=await fixture({name:'selected.docx',format:'docx',content:'KEEP TOP\nREPEAT WORD\nKEEP MIDDLE\nREPEAT WORD\nKEEP END'})
   const docOriginal=await readFile(doc.item.target)
@@ -64,7 +65,7 @@ test('direct Office selection edits validate snapshots, preserve exact occurrenc
   const stale=await doc.select({...target,endOffset:start+15,selectedText:'WORD-EFFICIENT\r'})
   await doc.exec("univerAPI.getActiveDocument().insertText(0,'USER ')")
   await assert.rejects(edits.edit(owner,{selectionRef:stale,text:'WRONG'}),/已变化/)
-  await doc.save()
+  await doc.accept();await doc.save()
   assert.match(strFromU8(unzipSync(await readFile(doc.item.target))['word/document.xml']),/WORD-EFFICIENT/)
 
   const ppt=await fixture({name:'selected.pptx',format:'pptx',slides:[{title:'CONTROL',paragraphs:['KEEP PAGE']},{title:'TARGET',paragraphs:['REPEAT PPT then REPEAT PPT','KEEP END']}]})
@@ -82,7 +83,7 @@ test('direct Office selection edits validate snapshots, preserve exact occurrenc
   assert.deepEqual(pptAfter.transform,info.transform)
   assert.deepEqual(pptAfter.data.body.textRuns.map(x=>x.ts),info.data.body.textRuns.map(x=>x.ts))
   assert.deepEqual(await readFile(ppt.item.target),pptOriginal)
-  await ppt.save()
+  await ppt.accept();await ppt.save()
   assert.match(strFromU8(unzipSync(await readFile(ppt.item.target))['ppt/slides/slide2.xml']),/PPT-EFFICIENT/)
 
   const sheet=await fixture({name:'selected.xlsx',format:'xlsx',columns:['KEEP','TARGET'],rows:[[1,2],[3,4]]})
@@ -94,7 +95,7 @@ test('direct Office selection edits validate snapshots, preserve exact occurrenc
   const sheetResult=await edits.edit(owner,{selectionRef:sheetRef,values:[[156],['=A3*10']]})
   assert.equal(sheetResult.values[0][0],156);assert.equal(sheetResult.formulas[1][0],'=A3*10')
   assert.deepEqual((await sheet.exec("return univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2:A3').getValues()")).value,[[1],[3]])
-  await sheet.save()
+  await sheet.accept();await sheet.save()
   // Import the saved files into an independent runtime, rather than reading a
   // still-open draft or a cached preview.
   const freshDir=await mkdtemp(join(tmpdir(),'moki-selection-reopen-')),fresh=await createRuntime({dataDir:freshDir,sourceDb:null})

@@ -55,9 +55,9 @@ Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.
 Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
 
 Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
-Version: 0.1.61
-Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.61/dsh-moki-library-0.1.61.tgz
-SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.61/SHA256SUMS.txt
+Version: 0.1.62
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.62/dsh-moki-library-0.1.62.tgz
+SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.62/SHA256SUMS.txt
 
 Follow these steps:
 1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
@@ -67,7 +67,7 @@ Follow these steps:
    dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
 5. Check the installed version:
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   Confirm that desktop lists version 0.1.61 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+   Confirm that desktop lists version 0.1.62 (or the newer version retained above). Preserve existing plugins, configuration and library data.
 6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
 
 If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
@@ -81,12 +81,12 @@ If this conversation cannot download files or execute a terminal, the environmen
 
 ### Option 2: Install manually in a terminal
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.61.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.61).
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.62.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.62).
 2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.61.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.62.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -109,7 +109,13 @@ The GitHub source archive is for development; the `.tgz` release asset is the bu
 2. Organize virtual folders and tags. Search by name, tag or path, clear the search with one click, and switch between list/card views. Hover over a thumbnail for a larger preview.
 3. Open a file. By default, the main library uses separate preview windows and the side workspace opens new tabs. Settings can explicitly choose DSH's main window, a separate window or the default app.
 4. For editable formats, enter **Edit**, select the relevant content, press **Alt+D** and choose **Add selection to conversation**. Describe the task.
-5. Review the result, then **Save** or **Save as**. AI edits stay in the draft until saved. Reopen the file to check persistence.
+5. Review the highlighted AI edits, then choose **Accept** or **Discard edit**. After accepting, **Save** or **Save as** and reopen the file to check persistence.
+
+### Review before saving
+
+AI edits to text, Word, Excel and PowerPoint are highlighted. Expand the review bar to see locations and before/after content. Highlights are temporary decorations, never saved document formatting. **Accept confirms the draft; Save writes it to the original file.**
+
+You can ask DSH to continue editing before accepting an earlier edit. Each new edit builds on the visible draft and adds a review record. Choose **Accept all**, or **Undo latest edit** repeatedly to step back while retaining earlier pending edits. Selection, copying and AI collaboration remain available; manual input and saving wait until review is resolved. Pending records recover with the draft. If another window changes that draft, cancellation reports the conflict and preserves the current content.
 
 ### Practical examples
 

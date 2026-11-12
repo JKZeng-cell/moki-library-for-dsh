@@ -1,4 +1,7 @@
 import { l as uiText, intlLocale } from '../../../../src/i18n.js';
+import {textChange} from '../../../../src/edit-review.js';
+import {EditReviewBar,ReviewTextEditor,type TextReview,type ReviewEntry,type ReviewChange} from './edit-review.js';
+import {flushSync} from 'react-dom';
 import { SpreadsheetPreview } from "./spreadsheet-preview.js";
 import {ExtraFilePreview,useFilePreviewInfo} from './resource-extra-preview.js';
 import {readPreviewSelection,previewLocation,selectionLabel,capturePreviewVisual,type PreviewSelection,type VisualSnapshot} from './resource-preview-selection.js';
@@ -477,6 +480,20 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const textDraftActiveRef = useRef(false);
   textDraftActiveRef.current = editingText || dirty;
   const [textHistory, setTextHistory] = useState<{undo:string[];redo:string[]}>({undo:[],redo:[]});
+  const [textReviews,setTextReviews]=useState<TextReview[]>([]);
+  const textReviewSequence=useRef(0);
+  const [officeReviews,setOfficeReviews]=useState<ReviewEntry[]>([]);
+  const [officeReviewHighlights,setOfficeReviewHighlights]=useState<ReviewChange[]>([]);
+  const [reviewPreparing,setReviewPreparing]=useState(false);
+  const [officeReviewLocked,setOfficeReviewLocked]=useState(false);
+  const [reviewRemoteBusy,setReviewRemoteBusy]=useState(false);
+  const [reviewResolving,setReviewResolving]=useState(false);
+  const pendingReviews=textReviews.length+officeReviews.length;
+  const reviewBusy=reviewPreparing||reviewRemoteBusy||reviewResolving;
+  const reviewEntries:ReviewEntry[]=editingText?textReviews.map((entry,index)=>{
+    const change=textChange(entry.before,textReviews[index+1]?.before??textContent);
+    return {...entry,changes:change?[change]:[],count:change?1:0};
+  }):officeReviews;
   const embedded = displayMode === "embedded";
   const onDirtyChangeRef = useRef(onDirtyChange);
   onDirtyChangeRef.current = onDirtyChange;
@@ -516,7 +533,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const mokiEditorAssistantOpenedRef = useRef(false);
   const univerSessionRef = useRef<ResourceLibraryUniverSession | undefined>(undefined);
   const editorRevision = useRef({ signature: '', value: 0 });
-  const editorSignature = JSON.stringify([textContent, editingText, editingOffice, univerSession?.sessionId,textHistory.undo.length,textHistory.redo.length]);
+  const editorSignature = JSON.stringify([textContent, editingText, editingOffice, univerSession?.sessionId,textHistory.undo.length,textHistory.redo.length,pendingReviews]);
   if (editorRevision.current.signature !== editorSignature) editorRevision.current = { signature: editorSignature, value: editorRevision.current.value + 1 };
   const officeEditable = kind !== 'pending' && isOfficeEditorSupportedExtension(extension);
   const editorOperations: WorkspaceEditorState['operations'] = loading || saving ? [] : [
@@ -530,13 +547,13 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   ];
   useWorkspaceEditor(embedded && item.kind === 'local_file', {
     id: item.id, name: item.name, active, mode: editingOffice ? 'office' : editingText ? 'text' : 'preview',
-    sessionId: univerSession?.sessionId, dirty, revision: editorRevision.current.value, operations: editorOperations,
+    sessionId: univerSession?.sessionId, dirty, revision: editorRevision.current.value, operations: editorOperations,reviewCapable:true,pendingReviews,
   }, executeWorkspaceCommand);
   const [autosaveStatus, setAutosaveStatus] = useState('');
   const autosavePending = useRef<Promise<void>>(Promise.resolve());
   const lastTextCheckpoint = useRef('');
-  const checkpointState = useRef({textContent,textSourceVersion,editingText,dirty,saving,session:univerSession});
-  checkpointState.current = {textContent,textSourceVersion,editingText,dirty,saving,session:univerSession};
+  const checkpointState = useRef({textContent,textSourceVersion,editingText,dirty,saving,session:univerSession,review:textReviews});
+  checkpointState.current = {textContent,textSourceVersion,editingText,dirty,saving,session:univerSession,review:textReviews};
   async function draftRequest<T extends Record<string,unknown> = Record<string,unknown>>(path:string, method='GET', body?:unknown):Promise<T> {
     const response=await apiFetch(`/api/library/items/${encodeURIComponent(item.id)}/${path}`,{
       method,
@@ -549,7 +566,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       try { result=JSON.parse(responseText) as Record<string,unknown>; }
       catch { result={error:responseText}; }
     }
-    if(!response.ok)throw new Error(typeof result.error === 'string' ? result.error : response.statusText || uiText("自动保存草稿失败"));
+    if(!response.ok)throw new Error(typeof result.error === 'string' ? uiText(result.error) : response.statusText || uiText("自动保存草稿失败"));
     return result as T;
   }
   function persistDraft(syncFrame=true): Promise<void> {
@@ -562,9 +579,9 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
         const saved=await draftRequest<{savedAt:string}>(`univer-session/${current.session.sessionId}/checkpoint`,'POST',{});
         setAutosaveStatus(uiText`草稿已自动保存 · ${new Date(saved.savedAt).toLocaleTimeString()}`);
       } else if(current.editingText || current.dirty) {
-        const signature=JSON.stringify([current.textContent,current.textSourceVersion]);
+        const signature=JSON.stringify([current.textContent,current.textSourceVersion,current.review]);
         if(signature===lastTextCheckpoint.current)return;
-        const saved=await draftRequest<{savedAt:string}>('draft','PUT',{content:current.textContent,version:current.textSourceVersion});
+        const saved=await draftRequest<{savedAt:string}>('draft','PUT',{content:current.textContent,version:current.textSourceVersion,review:current.review});
         lastTextCheckpoint.current=signature;
         setAutosaveStatus(uiText`草稿已自动保存 · ${new Date(saved.savedAt).toLocaleTimeString()}`);
       }
@@ -619,6 +636,59 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   }
   const selectionPublisher=useRef(publishPreviewSelection);selectionPublisher.current=publishPreviewSelection;
   const officeEditorFrameRef = useRef<HTMLIFrameElement>(null);
+  const officeReviewStamp=useRef('');
+  async function refreshOfficeReview() {
+    const session=univerSessionRef.current;if(!session)return;
+    const result=await draftRequest<{entries:ReviewEntry[];highlights:ReviewChange[];busy:boolean;stamp:string;unchanged?:boolean;session:Partial<ResourceLibraryUniverSession>}>(`univer-session/${session.sessionId}/review?after=${officeReviewStamp.current}`);
+    if(univerSessionRef.current?.sessionId!==session.sessionId)return;
+    if(result.unchanged)return;
+    officeReviewStamp.current=result.stamp;
+    setOfficeReviews(result.entries);setOfficeReviewHighlights(result.highlights);setReviewRemoteBusy(result.busy);
+    if(result.session.viewerUrl!==session.viewerUrl){const next={...session,...result.session};univerSessionRef.current=next;setUniverSession(next);}
+    if(result.entries.length)setDirty(true);
+    return result;
+  }
+  const refreshReviewRef=useRef(refreshOfficeReview);refreshReviewRef.current=refreshOfficeReview;
+  useEffect(()=>{
+    if(!univerSession?.sessionId)return;
+    let stopped=false,timer:ReturnType<typeof setTimeout>;
+    const poll=async()=>{try{await refreshReviewRef.current()}catch{}if(!stopped)timer=setTimeout(poll,1000);};
+    void poll();return()=>{stopped=true;clearTimeout(timer);};
+  },[univerSession?.sessionId]);
+  function postOfficeReview(locate?:ReviewChange) {
+    const frame=officeEditorFrameRef.current;if(!frame?.contentWindow)return;
+    frame.contentWindow.postMessage({type:'moki:univer-review',changes:officeReviewHighlights,locate},new URL(frame.src).origin);
+  }
+  useEffect(()=>{postOfficeReview();},[officeReviewHighlights]);
+  async function persistTextReview(content:string,review:TextReview[]) {
+    const pending=autosavePending.current.catch(()=>undefined).then(()=>draftRequest('draft','PUT',{content,version:textSourceVersion,review}));
+    autosavePending.current=pending.then(()=>undefined);await pending;
+    lastTextCheckpoint.current=JSON.stringify([content,textSourceVersion,review]);
+  }
+  async function resolveEditReview(action:'accept'|'reject',expectedId:string) {
+    if(reviewBusy)return;
+    setReviewResolving(true);
+    try {
+      if(editingText) {
+        const latest=textReviews.at(-1);if(latest?.id!==expectedId)throw new Error(uiText('待确认版本已变化，请查看最新修改后再操作'));
+        const content=action==='reject'?latest.before:textContent;
+        const entries=action==='reject'?textReviews.slice(0,-1):[];
+        await persistTextReview(content,entries);
+        setTextContent(content);setTextReviews(entries);setDirty(content!==savedTextContent);setTextHistory({undo:[],redo:[]});
+      } else {
+        const session=univerSessionRef.current;if(!session)return;
+        await draftRequest(`univer-session/${session.sessionId}/review`,'POST',{action,expectedId});
+        await refreshOfficeReview();setOfficeReviewLocked(false);
+      }
+      setNotice(action==='accept'?uiText('已采纳 AI 修改，可继续编辑或保存'):uiText('已取消最新一次 AI 修改，之前的内容已保留'));
+    } catch(error) {setNotice(error instanceof Error?error.message:String(error));}
+    finally {setReviewResolving(false);}
+  }
+  function locateReview(change:ReviewChange) {
+    if(univerSession){postOfficeReview(change.kind==='document'?officeReviewHighlights.find(current=>current.unitId===change.unitId&&current.kind==='document')??change:change);return;}
+    const textarea=previewWindowRef.current?.querySelector<HTMLTextAreaElement>('.moki-review-text-editor textarea');
+    if(textarea){const current=textChange(textReviews[0]?.before??textContent,textContent);const start=textContent.slice(0,current?.start??0).replace(/\r\n?/g,'\n').length,end=textContent.slice(0,current?.end??0).replace(/\r\n?/g,'\n').length;textarea.focus();textarea.setSelectionRange(start,end);textarea.scrollTop=Math.max(0,(textarea.value.slice(0,start).split('\n').length-3)*24);textarea.dispatchEvent(new Event('scroll'));}
+  }
   const previewResizeRef = useRef<{
     pointerId: number;
     startX: number;
@@ -693,6 +763,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     setCompatibleMedia(false);
     setTextContent("");
     setTextHistory({undo:[],redo:[]});
+    setTextReviews([]);setOfficeReviews([]);setOfficeReviewHighlights([]);officeReviewStamp.current='';setOfficeReviewLocked(false);setReviewPreparing(false);setReviewRemoteBusy(false);
     setSavedTextContent("");
     setTextSourceVersion(undefined);
     setEditingText(false);
@@ -748,9 +819,10 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
         setTextContent(result.content);
         setSavedTextContent(result.content);
         setTextSourceVersion(result.version);
-        void draftRequest<{draft?:{content:string;version?:string;savedAt?:string}}>('draft').then(({draft})=>{
+        void draftRequest<{draft?:{content:string;version?:string;savedAt?:string;review?:TextReview[]}}>('draft').then(({draft})=>{
           if(cancelled || !draft)return;
           setTextContent(draft.content);setTextSourceVersion(draft.version ?? result.version);
+          setTextReviews(draft.review??[]);textReviewSequence.current=Math.max(0,...(draft.review??[]).map(entry=>entry.sequence));
           setEditingText(true);setDirty(draft.content!==result.content);
           setNotice(uiText("已恢复上次自动保存的草稿；原文件未被覆盖"));
         }).catch(error=>{if(!cancelled)setNotice(String(error));});
@@ -833,7 +905,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const delimiter = extension === "tsv" ? "\t" as const : "," as const;
   const tableRows = useMemo(() => tableMode ? parseDelimitedText(textContent, delimiter) : [], [delimiter, tableMode, textContent]);
   const tableCellCount = tableRows.reduce((total, row) => total + row.length, 0);
-  const renderEditableTable = editingText && tableMode && tableCellCount <= 12_000;
+  const renderEditableTable = editingText && !pendingReviews && !reviewBusy && tableMode && tableCellCount <= 12_000;
   const renderReadOnlyTable = !editingText && tableMode && tableCellCount <= 12_000;
 
   async function copySource() {
@@ -950,6 +1022,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   }, [item.id, kind]);
 
   async function saveText(propagate = false) {
+    if(pendingReviews||reviewBusy){setNotice(uiText('请先采纳或取消 AI 修改，再保存文件'));if(propagate)throw new Error(uiText('请先采纳或取消 AI 修改，再保存文件'));return;}
     setSaving(true);
     setNotice("");
     try {
@@ -1020,6 +1093,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       await discardOfficeSession(session);
       univerSessionRef.current = undefined;
       setUniverSession(undefined);
+      setOfficeReviews([]);setOfficeReviewLocked(false);
       setStructuredPreview(savedStructuredPreview ? structuredClone(savedStructuredPreview) : undefined);
       setEditingOffice(false);
       finishMokiEditorAssistance();
@@ -1109,8 +1183,9 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     if (!univerSession?.viewerUrl) return undefined;
     const url = new URL(univerSession.viewerUrl, window.location.href);
     url.searchParams.set("lang", intlLocale());
+    if(officeReviews.length||officeReviewLocked)url.searchParams.set('editable','false');
     return url.href;
-  }, [univerSession?.viewerUrl]);
+  }, [univerSession?.viewerUrl,Boolean(officeReviews.length||officeReviewLocked)]);
   useEffect(() => {
     if (!univerSession?.viewerUrl) return;
     const observer = new MutationObserver(syncOfficeTheme);
@@ -1170,6 +1245,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   }
 
   async function saveOffice(propagate = false) {
+    if(pendingReviews||reviewBusy){setNotice(uiText('请先采纳或取消 AI 修改，再保存文件'));if(propagate)throw new Error(uiText('请先采纳或取消 AI 修改，再保存文件'));return;}
     const session = univerSessionRef.current;
     if (!session) return;
     setSaving(true);
@@ -1202,6 +1278,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   }
 
   async function saveOfficeAs(destinationOverride?: string, propagate = false) {
+    if(pendingReviews||reviewBusy){setNotice(uiText('请先采纳或取消 AI 修改，再保存文件'));if(propagate)throw new Error(uiText('请先采纳或取消 AI 修改，再保存文件'));return;}
     const session = univerSessionRef.current;
     if (!session) return;
     const selectSavePath = window.mokiDesktop?.selectSavePath;
@@ -1219,6 +1296,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       const result = await saveAsResourceLibraryUniverSession(item.id, session.sessionId, item.name, destination ?? undefined);
       univerSessionRef.current = undefined;
       setUniverSession(undefined);
+      setOfficeReviews([]);setOfficeReviewLocked(false);
       setStructuredPreview(savedStructuredPreview ? structuredClone(savedStructuredPreview) : undefined);
       setEditingOffice(false);
       finishMokiEditorAssistance();
@@ -1238,6 +1316,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   }
 
   function textHistoryStep(operation: 'undo' | 'redo') {
+    if(pendingReviews||reviewBusy)throw new Error(uiText('请先在审阅栏采纳或取消 AI 修改'));
     const source = textHistory[operation];
     const previous = source.at(-1);
     if (previous === undefined) throw new Error(uiText("没有可回退的助手编辑"));
@@ -1256,6 +1335,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       lastTextCheckpoint.current='';setAutosaveStatus('');
       checkpointState.current={...checkpointState.current,textContent:savedTextContent,editingText:false,dirty:false,saving:false};
       setTextContent(savedTextContent);setTextHistory({undo:[],redo:[]});
+      setTextReviews([]);
       setDirty(false);setEditingText(false);finishMokiEditorAssistance();
       setRenderedTextPreview(['md','markdown','html','htm','json'].includes(extension));
       setNotice(uiText("已放弃草稿，原文件没有被修改"));
@@ -1311,6 +1391,16 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   }, [item.id, onCloseRequestReady]);
 
   async function executeWorkspaceCommand(command: WorkspaceEditorCommand): Promise<WorkspaceEditorResult> {
+    if(command.operation==='review_control') {
+      if(command.phase==='prepare') {
+        if(reviewResolving||saving)throw new Error(uiText('正在确认或保存修改，请稍后重试'));
+        flushSync(()=>setReviewPreparing(true));
+        try {if(univerSessionRef.current)await prepareOfficeEditorSave(univerSessionRef.current);setOfficeReviewLocked(true);}
+        catch(error){setReviewPreparing(false);throw error;}
+      } else {await refreshOfficeReview();setReviewPreparing(false);setOfficeReviewLocked(false);}
+      return {status:'completed',message:'Review state synchronized'};
+    }
+    if((pendingReviews||reviewBusy)&&['save','save_as','discard','undo','redo'].includes(command.operation))throw new Error(uiText('请先在审阅栏采纳或取消 AI 修改'));
     if (loading || saving) throw new Error(uiText("编辑器正在加载或保存，请稍后重试"));
     if (!editorOperations.includes(command.operation)) throw new Error(uiText("当前格式或状态不支持此操作"));
     if (command.operation === 'edit') {
@@ -1329,11 +1419,17 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       if(command.operation==='replace_range'&&(!range||range.end>textContent.length||textContent.slice(range.start,range.end)!==range.expectedText))throw new Error(uiText("选区内容已变化，请重新读取草稿和位置"));
       const nextContent = command.operation === 'patch_text' ? applyTextDraftPatches(textContent, command.patches ?? []) : command.operation==='replace_range'?textContent.slice(0,range!.start)+command.content!+textContent.slice(range!.end):command.content!;
       if (nextContent === textContent) return {status:'completed',message:uiText("草稿内容未变化")};
+      if(textReviews.length>=20 || textReviews.reduce((n,e)=>n+e.before.length,0)+textContent.length+nextContent.length>3_500_000)throw new Error(uiText('待确认修改较多，请先采纳或取消后继续'));
+      const review={id:crypto.randomUUID(),sequence:++textReviewSequence.current,createdAt:new Date().toISOString(),before:textContent};
+      const reviews=[...textReviews,review];
+      flushSync(()=>setReviewPreparing(true));
+      try {await persistTextReview(nextContent,reviews);}finally{setReviewPreparing(false);}
+      setTextReviews(reviews);
       const undo=[...textHistory.undo,textContent].slice(-20);
       while(undo.length>1 && undo.reduce((size,text)=>size+text.length,0)>5_000_000) undo.shift();
       setTextHistory({undo,redo:[]});
       setTextContent(nextContent); setDirty(true);selectedPreview.current={};
-      return {status:'completed',message:uiText("当前文本草稿已直接更新，可撤销；尚未保存到原文件")};
+      return {status:'completed',message:uiText('AI 修改已高亮，等待用户采纳或取消；尚未保存'),review:{id:review.id,pending:reviews.length}};
     }
     if (command.operation === 'undo' || command.operation === 'redo') {
       textHistoryStep(command.operation);
@@ -1742,8 +1838,8 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
           {(kind === "audio" || kind === "embedded" || kind === "web" || kind === "unsupported") ? <IconButton aria-label={uiText("复制文件位置")} onClick={() => void copySource()}><Copy size={16}/></IconButton> : null}
           {item.kind === "local_file" && (officeEditable || kind === "workspace") ? editingOffice ? <>
             <Button size="compact" className="dsh-compact-action" aria-label={uiText("取消编辑")} title={uiText("取消编辑")} disabled={saving} onClick={() => void requestEditorExit("cancel")}><Undo2 size={14}/><span className="dsh-action-label">{uiText("取消")}</span></Button>
-            <Button size="compact" className="dsh-compact-action" aria-label={uiText("另存为")} title={uiText("另存为")} disabled={!dirty || saving} onClick={() => void saveOfficeAs()}><FileOutput size={14}/><span className="dsh-action-label">{uiText("另存为")}</span></Button>
-            <Button size="compact" variant="primary" disabled={!dirty || saving} onClick={() => void saveOffice()}>{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}{uiText("保存")}</Button>
+            <Button size="compact" className="dsh-compact-action" aria-label={uiText("另存为")} title={uiText(pendingReviews||reviewBusy?'请先采纳或取消 AI 修改，再保存文件':'另存为')} disabled={!dirty || saving || Boolean(pendingReviews) || reviewBusy} onClick={() => void saveOfficeAs()}><FileOutput size={14}/><span className="dsh-action-label">{uiText("另存为")}</span></Button>
+            <Button size="compact" variant="primary" title={pendingReviews||reviewBusy?uiText('请先采纳或取消 AI 修改，再保存文件'):undefined} disabled={!dirty || saving || Boolean(pendingReviews) || reviewBusy} onClick={() => void saveOffice()}>{saving ? <LoaderCircle size={16} className="animate-spin"/> : <Save size={16}/>}{uiText("保存")}</Button>
           </> : <>
             <IconButton aria-label={kind === "workspace" ? uiText("编辑 Univer") : uiText("编辑 Office")} disabled={loading} onClick={() => void startOfficeEditing()}><Pencil size={16}/></IconButton>
             <IconButton aria-label={uiText("复制文件位置")} onClick={() => void copySource()}><Copy size={16}/></IconButton>
@@ -1760,16 +1856,17 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
               <IconButton aria-label={uiText("编辑")} title={uiText("编辑")} onClick={() => { setEditingText(true); setRenderedTextPreview(false); setNotice(""); }}><Pencil size={14}/></IconButton>
               <IconButton aria-label={uiText("复制文本")} onClick={() => void copyText(textContent, uiText("已复制文本"))}><Copy size={14}/></IconButton>
             </> : <>
-              <IconButton aria-label={uiText("撤销助手编辑")} title={uiText("撤销助手编辑")} disabled={saving || !textHistory.undo.length} onClick={() => textHistoryStep('undo')}>↶</IconButton>
-              <IconButton aria-label={uiText("重做助手编辑")} title={uiText("重做助手编辑")} disabled={saving || !textHistory.redo.length} onClick={() => textHistoryStep('redo')}>↷</IconButton>
+              <IconButton aria-label={uiText("撤销助手编辑")} title={uiText("撤销助手编辑")} disabled={saving || Boolean(pendingReviews) || reviewBusy || !textHistory.undo.length} onClick={() => textHistoryStep('undo')}>↶</IconButton>
+              <IconButton aria-label={uiText("重做助手编辑")} title={uiText("重做助手编辑")} disabled={saving || Boolean(pendingReviews) || reviewBusy || !textHistory.redo.length} onClick={() => textHistoryStep('redo')}>↷</IconButton>
               <Button size="compact" className="dsh-compact-action" aria-label={uiText("取消编辑")} title={uiText("取消编辑")} disabled={saving} onClick={() => void requestEditorExit("cancel")}><Undo2 size={14}/><span className="dsh-action-label">{uiText("取消")}</span></Button>
-              <Button size="compact" variant="primary" disabled={!dirty || saving} onClick={() => void saveText()}>{saving ? <LoaderCircle size={13} className="animate-spin"/> : <Save size={13}/>}{uiText("保存")}</Button>
+              <Button size="compact" variant="primary" title={pendingReviews||reviewBusy?uiText('请先采纳或取消 AI 修改，再保存文件'):undefined} disabled={!dirty || saving || Boolean(pendingReviews) || reviewBusy} onClick={() => void saveText()}>{saving ? <LoaderCircle size={13} className="animate-spin"/> : <Save size={13}/>}{uiText("保存")}</Button>
             </>}
           </> : null}
           {!editingOffice && !editingText ? <Button size="compact" className="dsh-compact-action" aria-label={uiText("系统打开")} title={uiText("用系统应用打开")} onClick={() => void onOpen(item)}><ExternalLink size={14}/><span className="dsh-action-label">{uiText("系统打开")}</span></Button> : null}
           <IconButton aria-label={uiText("关闭预览")} onClick={() => void requestEditorExit("close")}><X size={16}/></IconButton>
         </div>
       </header>
+      <EditReviewBar entries={reviewEntries} busy={reviewBusy} onResolve={(action,id)=>void resolveEditReview(action,id)} onLocate={locateReview}/>
       {exitIntent ? <LibraryDialog titleId="library-save-title" size="small" onDismiss={()=>{if (!saving) setExitIntent(undefined);}}>
         <section className="library-dialog-card">
           <header><h3 id="library-save-title">{uiText("保存对“")}{item.name}{uiText("”的修改？")}</h3></header>
@@ -1786,6 +1883,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
           try{const root=previewContent(),snapshot=root&&capturePreviewVisual(root,rect);if(!snapshot){setNotice(uiText("请在预览画面内框选"));return}rememberSnapshot(snapshot);window.getSelection()?.removeAllRanges();setSelectingRegion(false);askMokiToEdit()}catch{setSelectingRegion(false);setNotice(uiText("当前画面无法读取，请使用文字选区协作"))}
         }}/>}
         {editingOffice && univerSession ? <div className="absolute inset-0 z-20 bg-white">
+          {reviewBusy&&<div className="moki-review-shield" aria-label={uiText('正在同步 AI 修改')}/>}
           <iframe
             ref={officeEditorFrameRef}
             data-office-editor="true"
@@ -1793,7 +1891,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
             title={uiText`${item.name} Univer Office 编辑器`}
             allow="clipboard-read; clipboard-write"
             className="size-full border-0 bg-white"
-            onLoad={() => { syncOfficeTheme(); setNotice(univerSession.recoveredDraft ? uiText("已恢复上次草稿") : ""); }}
+            onLoad={() => { syncOfficeTheme(); postOfficeReview(); setNotice(univerSession.recoveredDraft ? uiText("已恢复上次草稿") : ""); }}
           />
         </div> : null}
         {previewUrl && kind === "image" ? <>
@@ -1906,7 +2004,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
         {previewUrl && kind === "embedded" && !pdfTextOpen ? extension==='pdf'?<Suspense fallback={<div role="status">{uiText("正在加载 PDF…")}</div>}><PdfPreview url={previewUrl}/></Suspense>:<iframe src={previewUrl} title={item.name} loading="lazy" className="size-full border-0"/> : null}
         {kind === "embedded" && extension === "pdf" && pdfTextOpen ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{ocrProgress ? uiText`正在${ocrProgress.phase === "rendering" ? uiText("渲染") : uiText("识别")}第 ${ocrProgress.currentPage}/${ocrProgress.totalPages} 页` : uiText("正在提取 PDF 文本")}</span></div> : structuredPreview?.kind === "pdf" ? <div className="library-pdf-text size-full overflow-auto bg-[#eef0f5] p-5"><div className="mx-auto grid max-w-4xl gap-4"><div className="flex items-center justify-between rounded-xl border border-[#e2e4ed] bg-white px-4 py-3"><span className="text-xs font-bold text-[#697083]">{uiText("文本来源")}</span><span className={`rounded-full px-2.5 py-1 text-[0.625rem] font-extrabold ${structuredPreview.source === "deepseek-ocr" ? "bg-[#e9e7ff] text-[#625bc5]" : "bg-[#edf9f4] text-[#357d65]"}`}>{structuredPreview.source === "deepseek-ocr" ? "DeepSeek OCR" : uiText("PDF 文字层")}</span></div>{structuredPreview.pages.map((page) => <article key={page.number} data-moki-page-number={page.number} data-moki-location={JSON.stringify({kind:"pdf",page:page.number})} className="rounded-xl bg-white px-8 py-7 shadow-sm"><div className="mb-4 flex items-center justify-between border-b border-[#eceef3] pb-3"><b className="text-[0.75rem] text-[#464c61]">{uiText("第")}{page.number}{uiText("页")}</b><span className="text-[0.625rem] font-semibold text-[#999fb0]">{page.text.length}{uiText("字符")}</span></div>{page.text ? structuredPreview.source === "deepseek-ocr" ? <MarkdownRenderer content={page.text} className="text-sm leading-7"/> : <p data-moki-selection-text="pdf-text" className="whitespace-pre-wrap text-sm leading-7 text-[#30364b]">{page.text}</p> : <p className="text-sm font-semibold text-[#9a7a3b]">{uiText("本页没有可提取的文本层，可点击 DeepSeek OCR 识别")}</p>}</article>)}</div></div> : <div className="grid size-full place-items-center text-sm font-bold text-[#7c8294]">{uiText("无法提取此 PDF 的文本")}</div> : null}
         {previewUrl && kind === "web" ? <div className="flex size-full flex-col bg-white"><div className="flex shrink-0 items-center gap-2 border-b border-[#e3e5ed] bg-[#f7f8fb] px-3 py-2 text-[0.6875rem] font-semibold text-[#697083]"><span className="size-2 rounded-full bg-[#4aa681]"/><span className="min-w-0 flex-1 truncate">{uiText("网页预览")}</span></div><iframe src={previewUrl} title={uiText`${item.name} 在线页面`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox={onlinePreviewSandbox(previewUrl)} className="min-h-0 flex-1 border-0"/></div> : null}
-        {kind === "text" ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在读取文本")}</span></div> : !editingText && renderedTextPreview && ["html", "htm"].includes(extension) ? <iframe title={uiText`${item.name} HTML 预览`} srcDoc={textContent} sandbox="allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" referrerPolicy="no-referrer" className="size-full border-0 bg-white"/> : !editingText && renderedTextPreview && ["md", "markdown"].includes(extension) ? <div className="size-full overflow-auto bg-white p-6"><MarkdownRenderer content={textContent} className="mx-auto max-w-4xl text-sm leading-7"/></div> : !editingText && renderedTextPreview && extension === "json" ? <pre className="size-full overflow-auto bg-[#171b2c] p-5 font-mono text-xs leading-6 text-[#d9dcf0]">{(() => { try { return JSON.stringify(JSON.parse(textContent), null, 2); } catch { return textContent; } })()}</pre> : renderReadOnlyTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] px-2 py-1.5 text-[#34394e]">{cell}</td>)}</tr>)}</tbody></table></div> : renderEditableTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] p-0"><input aria-label={uiText`第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列`} value={cell} onChange={(event) => updateTableCell(rowIndex, columnIndex, event.target.value)} className="h-8 w-full min-w-32 bg-white px-2 outline-none focus:bg-[#f1f0ff]"/></td>)}</tr>)}</tbody></table></div> : editingText ? <div className="flex size-full flex-col"><textarea aria-label={uiText("资料文本编辑器")} autoFocus value={textContent} onChange={(event) => { setTextContent(event.target.value); setTextHistory(history=>({...history,redo:[]})); setDirty(true); }} spellCheck={false} className="min-h-0 flex-1 resize-none bg-white p-4 font-mono text-[0.75rem] leading-6 text-[#30364b] outline-none"/>{tableMode && tableCellCount > 12_000 ? <p className="shrink-0 border-t border-[#e2e4ed] bg-[#fff8e8] px-3 py-2 text-[0.625rem] font-semibold text-[#9a6d24]">{uiText("表格数据量较大，已切换为高性能文本编辑模式，保存时不会截断内容。")}</p> : null}</div> : <pre data-moki-selection-text="source" data-moki-text-source="true" className="size-full overflow-auto whitespace-pre-wrap bg-white p-5 font-mono text-[0.75rem] leading-6 text-[#30364b]">{textContent}</pre> : null}
+        {kind === "text" ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在读取文本")}</span></div> : !editingText && renderedTextPreview && ["html", "htm"].includes(extension) ? <iframe title={uiText`${item.name} HTML 预览`} srcDoc={textContent} sandbox="allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" referrerPolicy="no-referrer" className="size-full border-0 bg-white"/> : !editingText && renderedTextPreview && ["md", "markdown"].includes(extension) ? <div className="size-full overflow-auto bg-white p-6"><MarkdownRenderer content={textContent} className="mx-auto max-w-4xl text-sm leading-7"/></div> : !editingText && renderedTextPreview && extension === "json" ? <pre className="size-full overflow-auto bg-[#171b2c] p-5 font-mono text-xs leading-6 text-[#d9dcf0]">{(() => { try { return JSON.stringify(JSON.parse(textContent), null, 2); } catch { return textContent; } })()}</pre> : renderReadOnlyTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] px-2 py-1.5 text-[#34394e]">{cell}</td>)}</tr>)}</tbody></table></div> : renderEditableTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] p-0"><input aria-label={uiText`第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列`} value={cell} onChange={(event) => updateTableCell(rowIndex, columnIndex, event.target.value)} className="h-8 w-full min-w-32 bg-white px-2 outline-none focus:bg-[#f1f0ff]"/></td>)}</tr>)}</tbody></table></div> : editingText ? <div className="flex size-full flex-col"><ReviewTextEditor value={textContent} baseline={textReviews[0]?.before} locked={Boolean(pendingReviews||reviewBusy)} onChange={(event)=>{if(pendingReviews||reviewBusy)return;setTextContent(event.target.value);setTextHistory(history=>({...history,redo:[]}));setDirty(true);}}/>{tableMode && tableCellCount > 12_000 ? <p className="shrink-0 border-t border-[#e2e4ed] bg-[#fff8e8] px-3 py-2 text-[0.625rem] font-semibold text-[#9a6d24]">{uiText("表格数据量较大，已切换为高性能文本编辑模式，保存时不会截断内容。")}</p> : null}</div> : <pre data-moki-selection-text="source" data-moki-text-source="true" className="size-full overflow-auto whitespace-pre-wrap bg-white p-5 font-mono text-[0.75rem] leading-6 text-[#30364b]">{textContent}</pre> : null}
         {["document", "spreadsheet"].includes(kind) && !editingOffice ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在解析 Office 文件")}</span></div> : structuredPreview?.kind === "document" ? <article className="size-full overflow-auto bg-[#eef0f5] p-6"><div data-testid="office-document-preview" className="mx-auto min-h-full max-w-3xl rounded-sm bg-white px-12 py-10 text-sm leading-7 text-[#30364b] shadow-sm [&_p]:mb-3 [&_p]:whitespace-pre-wrap [&_table]:my-5 [&_table]:w-full [&_table]:border-collapse [&_td]:min-w-20 [&_td]:border [&_td]:border-[#d9dce6] [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">{structuredPreview.html ? <div className="contents" dangerouslySetInnerHTML={{ __html: structuredPreview.html }}/> : structuredPreview.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div></article> : structuredPreview?.kind === "spreadsheet" ? <SpreadsheetPreview sheets={structuredPreview.sheets} activeSheetIndex={activeSheetIndex} onActiveSheetIndex={setActiveSheetIndex}/> : <div className="grid size-full place-items-center text-sm font-bold text-[#7c8294]">{uiText("无法解析此 Office 文件")}</div> : null}
         {active && kind === "presentation" && extension === "key" && !editingOffice ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在解析演示文稿")}</span></div> : structuredPreview?.kind === "presentation" ? <StructuredPresentationSlides preview={structuredPreview}/> : <div className="grid size-full place-items-center text-sm font-bold text-[#7c8294]">{uiText("无法解析此演示文稿")}</div> : null}
         {active && kind === "presentation" && ["ppt", "pptx"].includes(extension) && !editingOffice ? <div ref={presentationPreviewRef} data-moki-page-number={presentationSlideIndex + 1} className="size-full min-h-0 overflow-hidden"><Suspense fallback={<div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在加载 PowerPoint 预览器")}</span></div>}>

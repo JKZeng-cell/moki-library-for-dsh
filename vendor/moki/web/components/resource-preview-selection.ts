@@ -6,7 +6,7 @@ function locationOf(element:Element){
   const context=element.closest<HTMLElement>('[data-moki-location]');
   try{return context?JSON.parse(context.dataset.mokiLocation!):{}}catch{return {}}
 }
-export function readPreviewSelection(root:HTMLElement|null,eventTarget?:EventTarget|null,sourceText?:string):PreviewSelection|undefined {
+export function readPreviewSelection(root:HTMLElement|null,eventTarget?:EventTarget|null,sourceText?:string,includeCaret=false):PreviewSelection|undefined {
   if(!root)return;
   const active=document.activeElement;
   if(active instanceof HTMLTextAreaElement && active.getAttribute('aria-label')===uiText("资料文本编辑器") && root.contains(active)){
@@ -19,7 +19,7 @@ export function readPreviewSelection(root:HTMLElement|null,eventTarget?:EventTar
       location:{kind:'text',scope:'source',indexUnit:'utf16',start,end,...position(text,start),endLine:position(text,end).line,endColumn:position(text,end).column}};
   }
   const selection=window.getSelection(),range=selection?.rangeCount?selection.getRangeAt(0):null;
-  if(range&&!range.collapsed&&root.contains(range.startContainer)&&root.contains(range.endContainer)){
+  if(range&&(!range.collapsed||includeCaret&&range.startContainer.nodeType===Node.TEXT_NODE)&&root.contains(range.startContainer)&&root.contains(range.endContainer)){
     const start=elementOf(range.startContainer)!,end=elementOf(range.endContainer)!;
     if(start.closest('button,input,textarea,[role=toolbar],.library-extra-toolbar'))return;
     const scope=start.closest<HTMLElement>('[data-moki-selection-text],pre,[data-testid="office-document-preview"]')||root;
@@ -30,7 +30,7 @@ export function readPreviewSelection(root:HTMLElement|null,eventTarget?:EventTar
     if(location.scope==='source'){Object.assign(location,position(scope.textContent||'',location.start));const finish=position(scope.textContent||'',location.end??location.start);Object.assign(location,{endLine:finish.line,endColumn:finish.column})}
     const cells:HTMLElement[]=[],first=start.closest<HTMLTableCellElement>('td[data-cell]'),last=end.closest<HTMLTableCellElement>('td[data-cell]'),table=first?.closest('table');
     if(first&&last&&table===last.closest('table'))for(let row=(first.parentElement as HTMLTableRowElement).rowIndex;row<=(last.parentElement as HTMLTableRowElement).rowIndex&&cells.length<200;row++)for(const cell of table!.rows[row].cells){if(cells.length>=200)break;if(cell.matches('td[data-cell]')&&range.intersectsNode(cell))cells.push(cell)}
-    return {selectedText:text.slice(0,8000),selectedTextTruncated:text.length>8000,location:cells.length?{...location,kind:'sheet',range:[first?.dataset.cell||cells[0].dataset.cell,last?.dataset.cell||cells.at(-1)!.dataset.cell].join(':'),cellsTruncated:cells.length>=200,cells:cells.map(c=>({address:c.dataset.cell,value:c.textContent?.slice(0,1000),formula:c.dataset.formula}))}:location};
+    return {selectedText:text.slice(0,8000),selectedTextTruncated:text.length>8000,location:cells.length?{...location,kind:'sheet',range:[first?.dataset.cell||cells[0].dataset.cell,last?.dataset.cell||cells.at(-1)!.dataset.cell].join(':'),cellsTruncated:cells.length>=200,cells:cells.map(c=>({address:c.dataset.cell,value:c.textContent?.slice(0,1000),formula:c.dataset.formula}))}:{...location,...(range.collapsed?{collapsed:true}:{})}};
   }
   const target=eventTarget instanceof Element?eventTarget:undefined;
   if(!target||!root.contains(target)||target.closest('button,input,textarea,.library-extra-toolbar'))return;

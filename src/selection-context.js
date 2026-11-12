@@ -10,7 +10,7 @@ export function compactSelection(data,{maxChars=4000,detail='compact'}={}){
   const result={...pick(data,['file','mode']),location:pick(location,[
     'kind','scope','indexUnit','unitId','sheetId','sheetName','range','row','column','endRow','endColumn',
     'slideId','page','endPage','slideName','selectedElementIds','textSelection','startOffset','endOffset','segmentId','collapsed',
-    'start','end','line','endLine','endColumn','path','byteOffset','time','duration','coordinateSpace','surface','region'
+    'start','end','line','endLine','endColumn','path','byteOffset','time','duration','coordinateSpace','surface','region','point'
   ])}
   if(Array.isArray(location.ranges)&&!(location.ranges.length===1&&location.ranges[0]===location.range))result.location.ranges=location.ranges
   let remaining=maxChars,truncated=Boolean(data.selectedTextTruncated||location.truncated||location.cellsTruncated)

@@ -11,6 +11,19 @@ export function installOfficeSelectionAction({readSelection,findService,prepare,
   else document.addEventListener('DOMContentLoaded',()=>document.body.append(button),{once:true})
   let timer,dragging=false,enabled=false,point=null,captured=null
   const hide=()=>{button.hidden=true;captured=null}
+  const validSelection=selection=>selection&&(selection.kind==='sheet'?Boolean(selection.range):selection.kind==='document'?Number.isFinite(selection.startOffset)&&Number.isFinite(selection.endOffset):selection.kind==='slide'?Boolean(selection.textSelection||selection.selectedElementIds?.length):false)
+  function sheetGeometry(selection) {
+    if(selection.kind!=='sheet')return null
+    const book=window.univerAPI?.getActiveWorkbook?.(),sheet=book?.getActiveSheet?.()
+    const render=findService(book,v=>typeof v?.getRenderUnitById==='function')?.getRenderUnitById(book.getId())
+    const scene=render?.scene,viewport=scene?.getMainViewport?.(),canvas=render?.engine?.getCanvasElement?.()
+    const box=sheet?.getRange(selection.endRow,selection.endColumn,1,1)?.getCellRect?.()
+    if(!box||!viewport||!canvas)return null
+    const bounds=canvas.getBoundingClientRect(),vector=scene.transform.applyPoint({x:0,y:0})
+    vector.x=box.right;vector.y=box.bottom;const end=viewport.getAbsoluteVector(vector)
+    vector.x=box.left;vector.y=box.top;const start=viewport.getAbsoluteVector(vector)
+    return {x:bounds.left+end.x,top:bounds.top+start.y,bottom:bounds.top+end.y,bounds}
+  }
   function textGeometry(selection) {
     if(selection.kind!=='document'&&!selection.textSelection)return null
     const doc=window.univerAPI?.getActiveDocument?.()
@@ -30,14 +43,15 @@ export function installOfficeSelectionAction({readSelection,findService,prepare,
       if(!enabled||dragging){hide();return}
       try {
         const selection=readSelection()
-        if(!selection?.selectedText?.trim()||selection.collapsed||selection.textSelection?.collapsed){hide();return}
-        const geometry=textGeometry(selection)||point
+        if(!validSelection(selection)){hide();return}
+        const geometry=textGeometry(selection)||sheetGeometry(selection)||point
         if(!geometry){hide();return}
         const bounds=geometry.bounds||{left:0,right:innerWidth,top:0,bottom:innerHeight}
         if(geometry.bottom<bounds.top||geometry.top>bounds.bottom||geometry.x<bounds.left||geometry.x>bounds.right){hide();return}
         const x=Math.max(bounds.left+4,Math.min(innerWidth-38,bounds.right-36,geometry.x))
         const bottom=Math.min(innerHeight-36,bounds.bottom-34),y=Math.max(bounds.top+4,Math.min(bottom,geometry.bottom+6<=bottom?geometry.bottom+6:geometry.top-38))
-        const label=/^zh/i.test(document.documentElement.lang||new URLSearchParams(location.search).get('lang')||'zh')?'引用选区与 DSH 对话':'Quote selection in DSH'
+        const blank=!selection.selectedText?.trim(),zh=/^zh/i.test(document.documentElement.lang||new URLSearchParams(location.search).get('lang')||'zh')
+        const label=blank?(zh?'在此处与 DSH 对话':'Chat with DSH here'):(zh?'引用选区与 DSH 对话':'Quote selection in DSH')
         button.title=label;button.setAttribute('aria-label',label);button.style.left=x+'px';button.style.top=y+'px';button.hidden=false
         captured={selection,x,y}
       }catch{hide()}
@@ -66,7 +80,7 @@ export function installOfficeSelectionAction({readSelection,findService,prepare,
   document.addEventListener('keyup',event=>{
     if(event.key==='Escape'){enabled=false;hide();return}
     if(!event.target?.closest?.('[data-u-comp="editor"],[data-u-comp="shape-text-editor-content"]')&&!(event.target instanceof HTMLCanvasElement)&&event.target!==button){enabled=false;hide();return}
-    if(event.shiftKey&&/^(Arrow|Home|End|Page)/.test(event.key))enabled=true
+    if(/^(Arrow|Home|End|Page|Enter|Tab|Backspace|Delete)/.test(event.key)||event.key.length===1)enabled=true
     if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='a')enabled=true
     update()
   },true)

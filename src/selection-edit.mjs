@@ -92,8 +92,9 @@ export function selectionEdits(runtime){
       snapshot={expectedText:data.selectedText,start:data.caret.start,end:data.caret.end}
     }else if(editor.mode==='office'&&editor.sessionId===data.unsavedDraft?.sessionId&&target){
       if(rawTarget.truncated||target.kind==='sheet'&&target.ranges?.length>1)return null
-      if(target.kind==='document'&&target.endOffset-target.startOffset>8000)return null
-      if(target.kind==='slide'&&(!target.textSelection||target.textSelection.endOffset-target.textSelection.startOffset>8000))return null
+      // A caret is a valid conversation location, but has no text to replace.
+      if(target.kind==='document'&&(target.endOffset<=target.startOffset||target.endOffset-target.startOffset>8000))return null
+      if(target.kind==='slide'&&(!target.textSelection||target.textSelection.endOffset<=target.textSelection.startOffset||target.textSelection.endOffset-target.textSelection.startOffset>8000))return null
       if(!['sheet','document','slide'].includes(target.kind))return null
       const office=await runtime.office(owner)
       const result=await office.execute(editor.sessionId,editor.id,code(target),target.unitId)

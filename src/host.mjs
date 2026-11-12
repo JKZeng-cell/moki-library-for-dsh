@@ -29,6 +29,7 @@ import { libraryTools, guidance } from './tools.mjs'
 
 const pluginVersion = JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version
 export const Config = schema.object({
+  language:schema.union(['auto','zh','en']).default(defaults.language).volatile(),
   previewMode:schema.union(['auto','main','window','system']).default(defaults.previewMode).volatile(),
   autoMapTaskFiles:schema.boolean().default(defaults.autoMapTaskFiles).volatile(),
   composerPicker:schema.boolean().default(defaults.composerPicker).volatile()

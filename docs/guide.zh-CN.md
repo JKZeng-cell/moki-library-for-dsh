@@ -8,6 +8,8 @@
 
 资料库工具栏的「资料库设置」和 DSH「设置 → MOKI资料库」同步保存以下选项。
 
+- **界面语言**支持「跟随 DSH」（默认）、「简体中文」和「English」。选择后立即更新资料库及预览工具栏，重启后保留，不改变 DSH 自身语言。已打开的 Office 编辑器在重新打开后应用新语言，以保留未保存草稿。
+
 - **文件预览打开方式**可选 DSH 主窗口、DSH 独立窗口或系统默认应用。默认跟随资料库位置。文件菜单中的「在侧边工作区打开」可单独指定这一次的去向。
 - **自动映射 DSH 任务文件**默认关闭。开启后，新建或交付的本地文件会出现在「DSH 任务文件」中。相同路径只映射一次，关闭后保留已有映射。
 - **对话输入框显示资料库**默认关闭。开启后，新会话的「资料库」按钮位于工作区与模式选择行的右侧，已有对话的入口位于输入框右上方。点击可浏览、搜索和多选文件，选好后用「添加附件」加入当前草稿，单个附件上限为 32 MB。
@@ -74,12 +76,12 @@ DOCX/XLSX/PPTX 的结构化预览按需读取压缩包内的文档数据，不�
 
 ### 手动安装与排查
 
-先启动一次 DSH 桌面端完成配置初始化，再完全退出。下载 [v0.1.60 Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.60) 中的 `dsh-moki-library-0.1.60.tgz`，在桌面配置中通过 CLI 安装。Windows CLI 位于 DSH 安装目录的 `resources/runtime/cli/bin/dsh.cmd`；包含完整路径和 PowerShell 调用方法的步骤见 [README 的手动安装](../README.zh-CN.md#manual-install)。
+先启动一次 DSH 桌面端完成配置初始化，再完全退出。下载 [v0.1.61 Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.61) 中的 `dsh-moki-library-0.1.61.tgz`，在桌面配置中通过 CLI 安装。Windows CLI 位于 DSH 安装目录的 `resources/runtime/cli/bin/dsh.cmd`；包含完整路径和 PowerShell 调用方法的步骤见 [README 的手动安装](../README.zh-CN.md#manual-install)。
 
 下面的简写适用于 `dsh` 已在 PATH 且对应当前桌面端的情况。将路径换成安装包实际绝对路径；有自定义 `DSH_HOME` 时沿用桌面端的值。
 
 ```powershell
-dsh plugin --profile desktop add 'dsh-moki-library@file:C:/Downloads/dsh-moki-library-0.1.60.tgz' --allow-build=sharp
+dsh plugin --profile desktop add 'dsh-moki-library@file:C:/Downloads/dsh-moki-library-0.1.61.tgz' --allow-build=sharp
 ```
 
 安装成功后执行：

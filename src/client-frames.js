@@ -1,4 +1,4 @@
-import { l as uiText, getLocale } from './i18n.js';
+import { l as uiText, getLocale, subscribeLocale } from './i18n.js';
 // Each retained DSH chat owns one library document. Moving it between native
 // panels preserves the editor, selection, scroll position and unsaved changes.
 import {installLibraryDrag} from './client-drag.js'
@@ -276,7 +276,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
     if(documents.length===1)send(documents[0],'activate-document',{sessionId})
   }
   const observer = new MutationObserver(syncTheme)
-  const unsubscribeLocale = ctx.locale.subscribe(syncTheme)
+  const unsubscribeLocale = subscribeLocale(syncTheme)
   observer.observe(document.documentElement, {attributes:true})
   observer.observe(document.body, {attributes:true})
   const media = matchMedia('(prefers-color-scheme: dark)')

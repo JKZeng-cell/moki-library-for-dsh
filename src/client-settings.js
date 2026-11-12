@@ -32,6 +32,9 @@ export function librarySettings(ctx, React, createPortal, Icon, ui) {
     const toggle=(field,title,detail)=>row(title,detail,h('input',{type:'checkbox',role:'switch',className:'ml-switch','aria-label':title,
       checked:!!opts[field],disabled,onChange:e=>void save(field,e.target.checked)}))
     return h('div',{className:'ml-setting-fields','aria-busy':!!pending},
+      row(uiText('界面语言'),uiText('仅设置资料库界面，切换后立即生效。'),h('select',{name:'language','aria-label':uiText('界面语言'),value:opts.language,disabled,
+        onChange:e=>void save('language',e.target.value)},
+        h('option',{value:'auto'},uiText('跟随 DSH')),h('option',{value:'zh'},'简体中文'),h('option',{value:'en'},'English'))),
       row(uiText("文件预览打开方式"),uiText("从资料库打开文件时使用。"),h('select',{'aria-label':uiText("文件预览打开方式"),value:opts.previewMode,disabled,
         onChange:e=>void save('previewMode',e.target.value)},
         Object.entries({auto:uiText("跟随资料库位置（默认）"),main:uiText("DSH 主窗口打开"),window:uiText("DSH 独立窗口打开"),system:uiText("默认应用打开")}).map(([value,label])=>h('option',{key:value,value},label)))),

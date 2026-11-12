@@ -6,7 +6,8 @@ import {drawLibraryMark,smallLibraryMark} from './library-mark.js'
 import {librarySettings} from './client-settings.js'
 import {registerComposerActions} from './client-picker.js'
 import {selectionQuote as quote} from './selection-context.js'
-import {setLocale} from './i18n.js'
+import {setLocale,getLocale,subscribeLocale} from './i18n.js'
+import {watchLibraryLanguage} from './preferences.mjs'
 import css from './client-shell.css'
 window.__ModuleLoader__.load({
   id:'dsh-moki-library',
@@ -35,15 +36,24 @@ window.__ModuleLoader__.load({
     return {
       inject:['slots','sidebarRight','sidebarRightTabs','layout','uiWorkspace','workspaces','sessions','uiConversation','uiSession','fileDrag','locale','configForms'],
       apply(ctx){
-        const syncLocale=()=>setLocale(ctx.locale.getSnapshot().active)
-        syncLocale()
-        ctx.effect(()=>ctx.locale.subscribe(syncLocale),'moki-library: interface language')
         const settings=librarySettings(ctx,React,require('react-dom').createPortal,Icon,ui)
+        ctx.effect(()=>watchLibraryLanguage(ctx.locale,settings.form,setLocale),'moki-library: interface language')
         const popup=window.parent!==window && /^#moki-preview-chat=([a-f0-9-]{36})$/.exec(location.hash)
         registerComposerActions(ctx,React,{...settings,Icon,ui,useQuote:popup?usePreviewQuote:useCatalogQuote})
         if(popup){registerPreviewChat(ctx,React,{key:popup[1],Chat,Conversation,useChatBinding,quote,QuoteContext:PreviewQuote,css,createPortal:require('react-dom').createPortal});return}
         const ns='mokiLibrary',labels={zh:{title:'MOKI资料库',open:'打开 MOKI资料库',guide:'管理文件、链接和文件夹，与 DSH 协同编辑。'},en:{title:'MOKI Library',open:'Open MOKI Library',guide:'Manage materials and edit with DSH.'}}
-        ctx.effect(()=>ctx.locale.register(ns,labels),'moki-library: locale')
+        ctx.effect(()=>{
+          let release=()=>{}
+          const update=()=>{
+            release()
+            const selected=labels[getLocale()]
+            // Only this plugin's namespace changes; DSH keeps its own language.
+            release=ctx.locale.register(ns,{zh:selected,en:selected})
+          }
+          const unsubscribe=subscribeLocale(update)
+          update()
+          return ()=>{unsubscribe();release()}
+        },'moki-library: locale')
         const t=ctx.locale.bind(ns)
         ctx.effect(()=>ctx.sidebarRightTabs.register({id:type,kind,title:()=>t('title'),keepMounted:true,guide:[{id:kind,order:24,title:()=>t('title'),description:()=>t('guide'),icon:Icon}]}),'moki-library: tab')
         const pool = createFramePool(isDark,ctx,quote,settings.form)

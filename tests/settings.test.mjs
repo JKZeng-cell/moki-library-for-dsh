@@ -4,8 +4,33 @@ import {mkdtemp, mkdir, writeFile, rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createRuntime} from '../lib/host.mjs'
-import {previewDestination} from '../src/preferences.mjs'
+import {previewDestination,libraryLanguage,watchLibraryLanguage} from '../src/preferences.mjs'
 import {listenForTaskFiles} from '../src/task-files.mjs'
+
+test('library language overrides are independent of DSH and follow the latest host language when reset',()=>{
+  const source=initial=>{
+    let value=initial;const listeners=new Set()
+    return {getSnapshot:()=>value,subscribe(fn){listeners.add(fn);return ()=>listeners.delete(fn)},
+      update(next){value=next;for(const fn of listeners)fn()},get size(){return listeners.size}}
+  }
+  const host=source({active:'zh'}),settings=source({value:{}}),seen=[]
+  const dispose=watchLibraryLanguage(host,settings,language=>seen.push(language))
+  assert.equal(seen.at(-1),'zh')
+  settings.update({value:{language:'en'}});assert.equal(seen.at(-1),'en')
+  assert.equal(host.getSnapshot().active,'zh','A plugin preference must not change DSH language')
+  host.update({active:'zh-CN'});assert.equal(seen.at(-1),'en')
+  settings.update({value:{language:'zh'}});host.update({active:'en'});assert.equal(seen.at(-1),'zh')
+  settings.update({value:{language:'auto'}});assert.equal(seen.at(-1),'en')
+  host.update({active:'zh'});assert.equal(seen.at(-1),'zh')
+  // Reconnecting reads the saved setting without a dialog being opened.
+  settings.update({value:{language:'en'}});dispose()
+  assert.equal(host.size,0);assert.equal(settings.size,0)
+  const next=[];const release=watchLibraryLanguage(host,settings,value=>next.push(value))
+  assert.deepEqual(next,['en']);release()
+  assert.equal(libraryLanguage('invalid','en-US'),'en')
+  assert.equal(libraryLanguage(undefined,'zh-TW'),'zh')
+  assert.equal(libraryLanguage('auto',undefined),'zh')
+})
 
 test('automatic and explicit file destinations in both library surfaces',()=>{
   for (const surface of ['main','side']) {

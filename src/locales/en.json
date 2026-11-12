@@ -1,4 +1,7 @@
 {
+  "界面语言": "Interface language",
+  "仅设置资料库界面，切换后立即生效。": "Applies to the library interface. Changes take effect immediately.",
+  "跟随 DSH": "Follow DSH",
   "处理中": "Working",
   "调整{0}列宽": "Resize {0} column",
   "{0} 像素": "{0} pixels",

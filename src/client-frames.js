@@ -103,6 +103,17 @@ export function createFramePool(isDark,ctx,quote,settings) {
     entry.state = {...entry.state, ...patch}
     for (const callback of entry.listeners) callback()
   }
+  function compose(entry,{selection=entry.state.selection,quoteSelection=false}={}) {
+    if(!entry.host)return
+    const inline=entry.mode==='side'
+    const current=ctx.uiSession.adapter.current.getSnapshot().key
+    // A retained document may have used a different session in its floating chat.
+    // The side workspace always belongs to the currently visible main session.
+    if(inline && (!current || (entry.chatSession && entry.chatSession!==current)))return
+    const target=inline?current:entry.state.chatTarget||entry.chatSession||null
+    update(entry,{chat:!inline,selection,...(inline?{chatTarget:null}:{}),
+      quoteRequest:inline||quoteSelection?{id:crypto.randomUUID(),selection,target,quoteSelection,destination:inline?'main':'floating'}:null})
+  }
   function move(entry, parent) {
     if (entry.frame.parentElement === parent) return
     if (parent.moveBefore && entry.frame.isConnected && parent.isConnected) {
@@ -155,6 +166,9 @@ export function createFramePool(isDark,ctx,quote,settings) {
     clearTimeout(entry.expiry)
     entry.host = host
     entry.mode = mode
+    if(mode==='side' && (entry.state.chat || entry.state.chatTarget || entry.state.quoteRequest)) {
+      update(entry,{chat:false,chatTarget:null,quoteRequest:null})
+    }
     move(entry,host)
     if (!entry.sequence) connect(entry)
     surface(entry)
@@ -254,8 +268,8 @@ export function createFramePool(isDark,ctx,quote,settings) {
           if (entry.state.selection?.content !== message.selection?.content || entry.state.selection?.label !== message.selection?.label) update(entry,{selection:message.selection})
           break
         case 'location': entry.itemId = message.itemId; if (entry.state.previewing !== message.previewing) update(entry,{previewing:message.previewing}); break
-        case 'compose': if (entry.host) update(entry,{chat:true,selection:message.selection,...(message.quoteSelection?{quoteRequest:{id:crypto.randomUUID(),selection:message.selection,target:entry.state.chatTarget||entry.chatSession||null}}:{})}); break
-        case 'exit': update(entry,{chat:false}); break
+        case 'compose': compose(entry,message); break
+        case 'exit': update(entry,{chat:false,quoteRequest:null}); break
         case 'error': update(entry,{notice:message.message}); break
       }
       break
@@ -285,7 +299,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
   document.addEventListener('focusin',focusComposer)
   window.addEventListener('focus',focusComposer)
   void poll()
-  return {entryFor,attach,connect,update,send,bindChat,windows,destroy,onCommand(fn){onCommand=fn},dispose() {
+  return {entryFor,attach,connect,update,compose,send,bindChat,windows,destroy,onCommand(fn){onCommand=fn},dispose() {
     disposed=true;clearTimeout(timer)
     drag.dispose()
     window.removeEventListener('message',onMessage)

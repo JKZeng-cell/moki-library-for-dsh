@@ -102,8 +102,9 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
     if(visible)entry.chatSession=sessionId
     const state = React.useSyncExternalStore(React.useCallback(fn=>{entry.listeners.add(fn);return ()=>entry.listeners.delete(fn)},[entry]),()=>entry.state)
     const host = React.useRef(null)
-    const target=state.chatTarget || sessionId
-    const chat=useChatBinding(ctx,pool,entry,target,visible && state.ready && Boolean(state.chat || state.chatTarget))
+    const main=mode==='main'
+    const target=main?(state.chatTarget || sessionId):sessionId
+    const chat=useChatBinding(ctx,pool,entry,target,visible && state.ready && Boolean(state.chat || state.chatTarget || state.quoteRequest))
     const selectedBinding=useSnapshot(chat.reference?ctx.uiSession.adapter.bindingSource(chat.reference):undefined)
     const destination=target===sessionId?binding:selectedBinding
     const input=useSnapshot(destination?.hooks.input)
@@ -123,13 +124,24 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
     const handledQuote=React.useRef(null)
     React.useEffect(()=>{
       const request=state.quoteRequest
-      if(!request||handledQuote.current===request.id||!visible||!state.chat||!chat.reference||!target)return
-      if(request.target&&request.target!==target){handledQuote.current=request.id;pool.update(entry,{quoteRequest:null});return}
-      const result=insertSelectionQuote(request,input,actions,quote)
+      if(!request||handledQuote.current===request.id||!visible||!target)return
+      if((request.target&&request.target!==target)||request.destination!==(main?'floating':'main')){handledQuote.current=request.id;pool.update(entry,{quoteRequest:null});return}
+      if(chat.error){handledQuote.current=request.id;pool.update(entry,{quoteRequest:null,notice:chat.error});return}
+      if(!chat.reference)return
+      const result=request.quoteSelection===false?(actions&&input?.phase==='plain'?{added:true}:null):insertSelectionQuote(request,input,actions,quote)
       if(!result)return
       handledQuote.current=request.id
       pool.update(entry,{quoteRequest:null,notice:result.added?'':uiText('当前对话输入框暂时无法接收选区')})
-    },[state.quoteRequest,visible,state.chat,chat.reference,target,input,actions,entry])
+      if(result.added && !main){
+        ctx.layout.selectPanel(null)
+        requestAnimationFrame(()=>{
+          if(!entry.host || entry.mode!=='side' || entry.state.quoteRequest || ctx.uiSession.adapter.current.getSnapshot().key!==target)return
+          const selector='[data-conversation-content][data-conversation-session="'+CSS.escape(target)+'"]'
+          const conversation=[...document.querySelectorAll(selector)].find(node=>node.getClientRects().length && !node.closest('.ml-dialog'))
+          conversation?.querySelector('[data-composer-input]')?.focus({preventScroll:true})
+        })
+      }
+    },[state.quoteRequest,visible,main,chat.reference,chat.error,target,input,actions,entry])
     React.useEffect(()=>{
       if (!visible || !target) return
       publish(target,{owner:entry,selection,add,added,disabled})
@@ -138,11 +150,10 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
     const closeChat=()=>{
       pool.update(entry,{chat:false,quoteRequest:null});entry.frame.focus();pool.send(entry,'focus-editor')
     }
-    const main=mode==='main'
     const switchLabel=main?uiText("在侧边工作区打开"):uiText("在主窗口打开")
     return h('section',{className:'ml-panel','data-ml-mode':mode,'data-file-open':state.previewing||undefined,onKeyDown:e=>{
       if (visible && !e.defaultPrevented && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.repeat && !e.nativeEvent.isComposing && (e.code==='KeyD' || e.key.toLowerCase()==='d')) {
-        e.preventDefault();e.stopPropagation();pool.update(entry,{chat:true})
+        e.preventDefault();e.stopPropagation();pool.compose(entry)
       }
     },'aria-label':main?uiText("MOKI资料库主窗口"):uiText("MOKI资料库侧边工作区")},
       h('div',{className:'ml-bar'},main?h('h1',null,t('title')):null,
@@ -155,13 +166,13 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
             else selectMain(null)
           },{'aria-label':switchLabel,title:switchLabel}),
           action(actionLabel(added?ui.IconCheckOutlineRegular:ui.IconContextInjectionOutlineRegular,added?uiText("已加入草稿"):uiText("选区加入对话")),add,{disabled,'aria-label':added?uiText("已加入草稿"):uiText("选区加入对话"),onMouseDown:e=>e.preventDefault(),title:target?(state.selection?.label||uiText("请先选择资料或文字")):uiText("请在 DSH 浮窗中新建或选择会话")}),
-          !state.previewing && action(actionLabel(ui.FishLogo,uiText("DSH 对话")),()=>pool.update(entry,{chat:!state.chat}),{variant:'outline','aria-label':uiText("DSH 对话"),disabled:!state.ready,'aria-expanded':state.chat,'aria-keyshortcuts':'Alt+D',title:uiText("DSH 对话 (Alt+D)")}),
+          !state.previewing && action(actionLabel(ui.FishLogo,uiText("DSH 对话")),()=>main&&state.chat?closeChat():pool.compose(entry),{variant:'outline','aria-label':uiText("DSH 对话"),disabled:!state.ready,'aria-expanded':main?state.chat:undefined,'aria-keyshortcuts':'Alt+D',title:uiText("DSH 对话 (Alt+D)")}),
           !documentId && h(SettingsButton))),
       state.error?h('div',{className:'ml-notice',role:'alert'},state.error,' ',action(uiText("重试"),()=>pool.connect(entry))):null,
       !state.error&&!state.ready?h('div',{className:'ml-notice',role:'status'},uiText("正在打开资料库…")):null,
       state.notice?h('div',{className:'ml-notice',role:'status'},state.notice,action(h(ui.IconCloseOutlineRegular,{size:14,'aria-hidden':true}),()=>pool.update(entry,{notice:''}),{'aria-label':uiText("关闭提示")})):null,
       h('div',{className:'ml-frame-holder',ref:host}),
-      state.chat&&visible?h(Chat,{ctx,mode,slotMode:documentId && !main?'document':mode,currentId:sessionId,target,chat,SessionProvider,renderSlot,
+      main&&state.chat&&visible?h(Chat,{ctx,mode,slotMode:mode,currentId:sessionId,target,chat,SessionProvider,renderSlot,
         choose:id=>pool.update(entry,{chatTarget:id,chat:true}),selection,onClose:closeChat}):null)
   }
   function MainSeat({renderSlot,SessionProvider}) {

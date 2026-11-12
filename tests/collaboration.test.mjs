@@ -6,7 +6,8 @@ import {tmpdir} from 'node:os'
 import {zipSync,strToU8} from 'fflate'
 import sharp from 'sharp'
 import puppeteer from 'puppeteer-core'
-import {transform} from 'esbuild'
+import {build} from 'esbuild'
+import {fileURLToPath} from 'node:url'
 import {apply} from '../lib/host.mjs'
 import {browserExecutables} from '../src/preview-browser.mjs'
 
@@ -34,8 +35,9 @@ function pdf(){
   const xref=output.length;output+='xref\n0 8\n0000000000 65535 f \n'+offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF';return output
 }
 test('large spreadsheet selections keep the full address while bounding sampled cells',async t=>{
-  const browser=await browserFor(t),page=await browser.newPage(),source=await readFile(new URL('../vendor/moki/web/components/resource-preview-selection.ts',import.meta.url),'utf8')
-  const {code}=await transform(source,{loader:'ts',format:'iife',globalName:'SelectionCapture'})
+  const browser=await browserFor(t),page=await browser.newPage()
+  const result=await build({entryPoints:[fileURLToPath(new URL('../vendor/moki/web/components/resource-preview-selection.ts',import.meta.url))],bundle:true,write:false,platform:'browser',format:'iife',globalName:'SelectionCapture'})
+  const code=result.outputFiles[0].text
   await page.setContent('<main id="preview" data-moki-location=\'{"kind":"sheet","sheetName":"Sheet1"}\'><table><tbody>'+Array.from({length:20},(_,r)=>'<tr>'+Array.from({length:20},(_,c)=>'<td data-cell="'+String.fromCharCode(65+c)+(r+1)+'">sample</td>').join('')+'</tr>').join('')+'</tbody></table></main>')
   await page.addScriptTag({content:code})
   const selected=await page.evaluate(()=>{const cells=document.querySelectorAll('td'),range=document.createRange();range.setStart(cells[0].firstChild,0);range.setEnd(cells[cells.length-1].firstChild,6);getSelection().addRange(range);return SelectionCapture.readPreviewSelection(document.querySelector('main'))})

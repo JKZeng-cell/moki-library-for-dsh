@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 type FetchImplementation = typeof globalThis.fetch;
 
 export type ApiFetchOptions = {
@@ -94,8 +95,8 @@ function requestedReadTimeout(init?: RequestInit): number | undefined {
 function connectionError(error: unknown, retried: boolean): Error {
   return new Error(
     retried
-      ? "本地工作台服务连接短暂中断，已等待服务恢复并自动重试，但本次请求仍未完成。请稍候再次操作。"
-      : "本地工作台服务连接短暂中断，本次操作未自动重放，请确认页面状态后再试。",
+      ? uiText("本地工作台服务连接短暂中断，已等待服务恢复并自动重试，但本次请求仍未完成。请稍候再次操作。")
+      : uiText("本地工作台服务连接短暂中断，本次操作未自动重放，请确认页面状态后再试。"),
     { cause: error },
   );
 }

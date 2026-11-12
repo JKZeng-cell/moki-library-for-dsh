@@ -439,10 +439,10 @@ test('marquee stays translucent and selects the intersected cards or rows withou
         const style=getComputedStyle(el),ctx=document.createElement('canvas').getContext('2d')
         ctx.fillStyle=style.backgroundColor;ctx.fillRect(0,0,1,1)
         return {alpha:ctx.getImageData(0,0,1,1).data[3],border:style.borderTopWidth,pointer:style.pointerEvents,
-          top:el.parentElement.getBoundingClientRect().top}
+          top:el.getBoundingClientRect().top,position:style.position}
       })
       assert.ok(appearance.alpha>0 && appearance.alpha<64,mode+' '+theme+' must leave the files visible')
-      assert.deepEqual([appearance.top,appearance.border,appearance.pointer],[drag.top,'1px','none'])
+      assert.deepEqual([appearance.position,appearance.top,appearance.border,appearance.pointer],['fixed',Math.min(drag.startY,drag.endY),'1px','none'])
       assert.deepEqual(await selected(),drag.ids)
       await page.mouse.up()
       await page.waitForSelector('.dsh-selection-toolbar')

@@ -74,12 +74,12 @@ DOCX/XLSX/PPTX 的结构化预览按需读取压缩包内的文档数据，不�
 
 ### 手动安装与排查
 
-先启动一次 DSH 桌面端完成配置初始化，再完全退出。下载 [v0.1.59 Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.59) 中的 `dsh-moki-library-0.1.59.tgz`，在桌面配置中通过 CLI 安装。Windows CLI 位于 DSH 安装目录的 `resources/runtime/cli/bin/dsh.cmd`；包含完整路径和 PowerShell 调用方法的步骤见 [README 的手动安装](../README.zh-CN.md#manual-install)。
+先启动一次 DSH 桌面端完成配置初始化，再完全退出。下载 [v0.1.60 Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.60) 中的 `dsh-moki-library-0.1.60.tgz`，在桌面配置中通过 CLI 安装。Windows CLI 位于 DSH 安装目录的 `resources/runtime/cli/bin/dsh.cmd`；包含完整路径和 PowerShell 调用方法的步骤见 [README 的手动安装](../README.zh-CN.md#manual-install)。
 
 下面的简写适用于 `dsh` 已在 PATH 且对应当前桌面端的情况。将路径换成安装包实际绝对路径；有自定义 `DSH_HOME` 时沿用桌面端的值。
 
 ```powershell
-dsh plugin --profile desktop add 'dsh-moki-library@file:C:/Downloads/dsh-moki-library-0.1.59.tgz' --allow-build=sharp
+dsh plugin --profile desktop add 'dsh-moki-library@file:C:/Downloads/dsh-moki-library-0.1.60.tgz' --allow-build=sharp
 ```
 
 安装成功后执行：

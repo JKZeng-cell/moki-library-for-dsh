@@ -1,3 +1,4 @@
+import { l as uiText, getLocale } from './i18n.js';
 // Each retained DSH chat owns one library document. Moving it between native
 // panels preserves the editor, selection, scroll position and unsaved changes.
 import {installLibraryDrag} from './client-drag.js'
@@ -13,7 +14,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
     const request=encodeURIComponent(JSON.stringify({action,client:desktop,...fields}))
     const response=await fetch('/moki-library/windows',{cache:'no-store',headers:{'x-moki-library':'1','x-moki-window-request':request}})
     const result=await response.json()
-    if(!response.ok || result.error)throw new Error(result.error || '无法连接 DSH 预览服务')
+    if(!response.ok || result.error)throw new Error(result.error || uiText("无法连接 DSH 预览服务"))
     return result
   }
   async function poll() {
@@ -51,7 +52,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
       if(retained){
         const channel=new MessageChannel()
         const checkpoint=new Promise((resolve,reject)=>{
-          const timeout=setTimeout(()=>{channel.port1.close();reject(new Error('侧栏草稿暂时无法转交'))},10000)
+          const timeout=setTimeout(()=>{channel.port1.close();reject(new Error(uiText("侧栏草稿暂时无法转交")))},10000)
           channel.port1.onmessage=({data})=>{clearTimeout(timeout);channel.port1.close();data.error?reject(new Error(data.error)):resolve(data.office)}
         })
         side.frame.contentWindow.postMessage({bridge:side.bridge,type:'checkpoint-document'},side.origin,[channel.port2])
@@ -81,9 +82,10 @@ export function createFramePool(isDark,ctx,quote,settings) {
   function appearance() {
     const style = getComputedStyle(document.body)
     const theme = Object.fromEntries(properties.map(name => [name,style.getPropertyValue(name).trim()]).filter(([,value]) => value))
-    return {dark:isDark(),theme,font:style.fontFamily,rootSize:getComputedStyle(document.documentElement).fontSize}
+    return {dark:isDark(),theme,font:style.fontFamily,rootSize:getComputedStyle(document.documentElement).fontSize,locale:getLocale()}
   }
   function surface(entry) {
+    if(!entry.documentId)entry.frame.title=uiText('MOKI资料库工作区')
     if (entry.state.ready) send(entry,'surface',{active:Boolean(entry.host),mode:entry.mode,...appearance()})
   }
   function send(entry, type, fields = {}) {
@@ -92,8 +94,8 @@ export function createFramePool(isDark,ctx,quote,settings) {
   function bindChat(entry,sessionId) {
     const requestId=crypto.randomUUID()
     return new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{entry.requests.delete(requestId);reject(new Error('资料库会话连接超时'))},10000)
-      entry.requests.set(requestId,ok=>{clearTimeout(timer);ok?resolve():reject(new Error('资料库未能连接到这个会话'))})
+      const timer=setTimeout(()=>{entry.requests.delete(requestId);reject(new Error(uiText("资料库会话连接超时")))},10000)
+      entry.requests.set(requestId,ok=>{clearTimeout(timer);ok?resolve():reject(new Error(uiText("资料库未能连接到这个会话")))})
       send(entry,'bind-chat',{sessionId,requestId})
     })
   }
@@ -119,13 +121,13 @@ export function createFramePool(isDark,ctx,quote,settings) {
       const params = new URLSearchParams({session:entry.id,parent:location.origin})
       if(entry.documentId)params.set('document',entry.documentId)
       const response = await fetch('/moki-library/open?' + params, {headers:{'x-moki-library':'1'},cache:'no-store'})
-      if (!response.ok) throw new Error('DSH 资料库服务返回 ' + response.status)
+      if (!response.ok) throw new Error(uiText("DSH 资料库服务返回 ") + response.status)
       const connection = await response.json()
       const url = new URL(connection.url)
       if (entry.sequence !== sequence) return
       entry.origin = url.origin
       entry.initialPreviewMode = connection.previewMode
-      url.search = new URLSearchParams({bridge:entry.bridge,parent:location.origin,theme:isDark()?'dark':'light',mode:entry.mode,...(entry.itemId?{itemId:entry.itemId}:{})})
+      url.search = new URLSearchParams({bridge:entry.bridge,parent:location.origin,theme:isDark()?'dark':'light',locale:getLocale(),mode:entry.mode,...(entry.itemId?{itemId:entry.itemId}:{})})
       if(entry.documentId){
         url.searchParams.set('document',entry.documentId)
         if(entry.chatSession)url.searchParams.set('chatId',entry.chatSession)
@@ -133,7 +135,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
       }
       if (connection.nativeFileDrag) url.searchParams.set('nativeFileDrag','1')
       entry.frame.src = url.href
-      entry.loadTimer = setTimeout(() => {if (!entry.state.ready) update(entry,{error:'资料库未能完成加载'})}, 45000)
+      entry.loadTimer = setTimeout(() => {if (!entry.state.ready) update(entry,{error:uiText("资料库未能完成加载")})}, 45000)
     } catch (error) {
       if (entry.sequence === sequence) update(entry, {error:error.message})
     }
@@ -142,7 +144,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
     if (entries.has(id)) return entries.get(id)
     const frame = document.createElement('iframe')
     frame.className = 'ml-frame'
-    frame.title = 'MOKI资料库工作区'
+    frame.title = uiText("MOKI资料库工作区")
     frame.allow = 'clipboard-read; clipboard-write'
     frame.referrerPolicy = 'no-referrer'
     const entry = {id,documentId,frame,bridge:crypto.randomUUID(),mode:'main',sequence:0,listeners:new Set(),requests:new Map(),state:{ready:false,selection:null,error:'',chat:false,notice:''}}
@@ -216,12 +218,12 @@ export function createFramePool(isDark,ctx,quote,settings) {
           if (!entry.host || !(message.file instanceof File) || !reply) break
           releaseExport(entry)
           const file = message.file, transport = ctx.fileDrag?.actions
-          if (!transport || !globalThis.dshDesktop?.fileDrag) { reply.postMessage({error:'系统文件拖出需要 DSH 桌面端'}); break }
+          if (!transport || !globalThis.dshDesktop?.fileDrag) { reply.postMessage({error:uiText("系统文件拖出需要 DSH 桌面端")}); break }
           const preparation = {token:message.token, abort:new AbortController()}
           entry.export = preparation
           transport.prepare({kind:'blob',blob:file,name:file.name,mediaType:file.type}, preparation.abort.signal)
             .then(operation => {
-              if (entry.export !== preparation) { operation.release(); throw new Error('已切换拖出的文件') }
+              if (entry.export !== preparation) { operation.release(); throw new Error(uiText("已切换拖出的文件")) }
               preparation.operation=operation
               preparation.timer=setTimeout(()=>releaseExport(entry),45000)
               reply.postMessage({value:true})
@@ -233,7 +235,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
           const reply=event.ports[0], preparation=entry.export
           if (!entry.host || !reply) break
           if (preparation?.token!==message.token || !preparation.operation) {
-            reply.postMessage({error:'拖出文件已过期，请再次拖动'})
+            reply.postMessage({error:uiText("拖出文件已过期，请再次拖动")})
             break
           }
           try { preparation.operation.start(); reply.postMessage({value:true}) }
@@ -274,6 +276,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
     if(documents.length===1)send(documents[0],'activate-document',{sessionId})
   }
   const observer = new MutationObserver(syncTheme)
+  const unsubscribeLocale = ctx.locale.subscribe(syncTheme)
   observer.observe(document.documentElement, {attributes:true})
   observer.observe(document.body, {attributes:true})
   const media = matchMedia('(prefers-color-scheme: dark)')
@@ -289,6 +292,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
     document.removeEventListener('focusin',focusComposer)
     window.removeEventListener('focus',focusComposer)
     observer.disconnect()
+    unsubscribeLocale()
     media.removeEventListener('change',syncTheme)
     for (const entry of entries.values()) destroy(entry)
     parking.remove()

@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { LIBRARY_COLUMN_LIMITS, LIBRARY_COLUMN_WIDTHS_KEY, clampLibraryColumnWidth, libraryColumnWidthsStyle, parseLibraryColumnWidths, type LibraryColumnField, type LibraryColumnWidths } from "../lib/library-column-widths.js";
 
@@ -74,10 +75,10 @@ function LibraryColumnResizeHandle({ field, label, active, widths, onStart, onKe
     window.addEventListener("resize", measure);
     return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
   }, [widths]);
-  return <span ref={ref} role="separator" tabIndex={0} aria-label={`调整${label}列宽`} aria-orientation="vertical"
+  return <span ref={ref} role="separator" tabIndex={0} aria-label={uiText`调整${label}列宽`} aria-orientation="vertical"
     aria-valuemin={LIBRARY_COLUMN_LIMITS[field].min} aria-valuemax={LIBRARY_COLUMN_LIMITS[field].max}
-    aria-valuenow={measured} aria-valuetext={measured === undefined ? undefined : `${measured} 像素`}
-    title="拖动调整列宽；方向键微调，Shift 加速；双击或按 Enter 恢复默认"
+    aria-valuenow={measured} aria-valuetext={measured === undefined ? undefined : uiText`${measured} 像素`}
+    title={uiText("拖动调整列宽；方向键微调，Shift 加速；双击或按 Enter 恢复默认")}
     className="library-column-resizer" data-active={active}
     onPointerDown={event => onStart(field, event)}
     onKeyDown={event => onKey(field, event)}

@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 import {useEffect,useRef,useState} from 'react';
 import {getDocument,GlobalWorkerOptions,TextLayer,type PDFDocumentProxy} from 'pdfjs-dist';
 import worker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -23,7 +24,7 @@ export default function PdfPreview({url}:{url:string}){
   },[pdf,page,zoom,width]);
   const location=JSON.stringify({kind:'pdf',page,totalPages:pdf?.numPages});
   return <div className="library-pdf-viewer" data-moki-view-context={location} data-moki-location={location}>
-    <div className="library-extra-toolbar"><button disabled={!pdf||page<=1} onClick={()=>setPage(page-1)}>上一页</button><label>页码 <input aria-label="PDF 页码" type="number" min={1} max={pdf?.numPages||1} value={page} onChange={e=>{const n=Number(e.target.value);if(n>=1&&n<=(pdf?.numPages||1))setPage(n)}}/></label><span>/ {pdf?.numPages||'…'}</span><button disabled={!pdf||page>=pdf.numPages} onClick={()=>setPage(page+1)}>下一页</button><button aria-label="缩小 PDF" disabled={zoom<=.5} onClick={()=>setZoom(Math.max(.5,zoom-.25))}>−</button><button aria-label="适应 PDF 宽度" onClick={()=>setZoom(1)}>{Math.round(zoom*100)}%</button><button aria-label="放大 PDF" disabled={zoom>=3} onClick={()=>setZoom(Math.min(3,zoom+.25))}>＋</button></div>
-    <div ref={scroll} className="library-extra-scroll library-pdf-pages">{busy&&<p role="status">正在读取第 {page} 页…</p>}{error&&<p role="alert">{error}；可使用系统打开。</p>}<div className="library-pdf-page"><canvas ref={canvas}/><div ref={layer} className="library-pdf-text-layer" data-moki-selection-text="pdf"/></div></div>
+    <div className="library-extra-toolbar"><button disabled={!pdf||page<=1} onClick={()=>setPage(page-1)}>{uiText("上一页")}</button><label>{uiText("页码")}<input aria-label={uiText("PDF 页码")} type="number" min={1} max={pdf?.numPages||1} value={page} onChange={e=>{const n=Number(e.target.value);if(n>=1&&n<=(pdf?.numPages||1))setPage(n)}}/></label><span>/ {pdf?.numPages||'…'}</span><button disabled={!pdf||page>=pdf.numPages} onClick={()=>setPage(page+1)}>{uiText("下一页")}</button><button aria-label={uiText("缩小 PDF")} disabled={zoom<=.5} onClick={()=>setZoom(Math.max(.5,zoom-.25))}>−</button><button aria-label={uiText("适应 PDF 宽度")} onClick={()=>setZoom(1)}>{Math.round(zoom*100)}%</button><button aria-label={uiText("放大 PDF")} disabled={zoom>=3} onClick={()=>setZoom(Math.min(3,zoom+.25))}>＋</button></div>
+    <div ref={scroll} className="library-extra-scroll library-pdf-pages">{busy&&<p role="status">{uiText("正在读取第")}{page}{uiText("页…")}</p>}{error&&<p role="alert">{error}{uiText("；可使用系统打开。")}</p>}<div className="library-pdf-page"><canvas ref={canvas}/><div ref={layer} className="library-pdf-text-layer" data-moki-selection-text="pdf"/></div></div>
   </div>
 }

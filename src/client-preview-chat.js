@@ -1,3 +1,4 @@
+import { l as uiText, useLibraryLocale } from './i18n.js';
 // This seat runs in the official DSH web client at DSH's own origin.
 // The document in the parent can request UI actions, never DSH RPCs.
 export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBinding,quote,QuoteContext,css,createPortal}) {
@@ -6,13 +7,14 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
     const headers={'x-moki-preview-chat':key}
     if(sessionId)headers['x-moki-chat-session']=sessionId
     const res=await fetch('/moki-library/preview-chat',{headers,cache:'no-store'})
-    if(!res.ok)throw new Error('当前文件与 DSH 的连接已失效，请重新打开对话。')
+    if(!res.ok)throw new Error(uiText("当前文件与 DSH 的连接已失效，请重新打开对话。"))
     return res.json()
   }
   const binding={bindChat:(_,id)=>context(id)}, child='moki-library.chat.preview'
   const empty={subscribe:()=>()=>{},getSnapshot:()=>null}
   const useSource=source=>React.useSyncExternalStore(React.useCallback(fn=>source.subscribe(fn),[source]),()=>source.getSnapshot())
   function Seat({SessionProvider,renderSlot}) {
+    useLibraryLocale(React)
     const [info,setInfo]=React.useState(null),[target,choose]=React.useState(null),[error,setError]=React.useState('')
     const [selection,setSelection]=React.useState(null)
     const parentOrigin=React.useRef(null),anchor=React.useRef(null)
@@ -59,7 +61,7 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
     const controls=React.useMemo(()=>({report:state=>post('state',state)}),[post])
     return h(React.Fragment,null,h('span',{ref:anchor,hidden:true}),createPortal(h('div',{className:'ml-preview-seat'},
       error?h('p',{role:'alert'},error):
-      resolving?h('p',{role:'status'},'正在载入 DSH 会话…'):
+      resolving?h('p',{role:'status'},uiText("正在载入 DSH 会话…")):
       info?h(QuoteContext.Provider,{value:quoteProps},h(Chat,{ctx,mode:'preview',target:selected,currentId:current.key,chat,choose,SessionProvider,renderSlot,selection,embeddedControls:controls,onClose:()=>post('close')})):null),document.body))
   }
   ctx.effect(()=>{

@@ -6,6 +6,7 @@ import {drawLibraryMark,smallLibraryMark} from './library-mark.js'
 import {librarySettings} from './client-settings.js'
 import {registerComposerActions} from './client-picker.js'
 import {selectionQuote as quote} from './selection-context.js'
+import {setLocale} from './i18n.js'
 import css from './client-shell.css'
 window.__ModuleLoader__.load({
   id:'dsh-moki-library',
@@ -34,6 +35,9 @@ window.__ModuleLoader__.load({
     return {
       inject:['slots','sidebarRight','sidebarRightTabs','layout','uiWorkspace','workspaces','sessions','uiConversation','uiSession','fileDrag','locale','configForms'],
       apply(ctx){
+        const syncLocale=()=>setLocale(ctx.locale.getSnapshot().active)
+        syncLocale()
+        ctx.effect(()=>ctx.locale.subscribe(syncLocale),'moki-library: interface language')
         const settings=librarySettings(ctx,React,require('react-dom').createPortal,Icon,ui)
         const popup=window.parent!==window && /^#moki-preview-chat=([a-f0-9-]{36})$/.exec(location.hash)
         registerComposerActions(ctx,React,{...settings,Icon,ui,useQuote:popup?usePreviewQuote:useCatalogQuote})

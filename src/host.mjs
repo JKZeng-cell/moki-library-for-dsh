@@ -39,7 +39,7 @@ const stateSchema = z.object({active:z.boolean(), focused:z.boolean().optional()
   selection:z.object({label:z.string().max(1000),content:z.string().max(4000000),itemCount:z.number().int().nonnegative()}).nullable()})
 const sessionIdOf = agent => agent?.session?.id ?? agent?.sessionId
 const localParent = origin => /^dsh-app:\/\/app$|^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/i.test(origin)
-const appearanceSchema=z.object({dark:z.boolean(),theme:z.record(z.string().regex(/^--dsw-(?:alias|font|radius)-[a-z0-9-]+$/),z.string().max(4096)),font:z.string().max(4096),rootSize:z.string().max(32)})
+const appearanceSchema=z.object({dark:z.boolean(),theme:z.record(z.string().regex(/^--dsw-(?:alias|font|radius)-[a-z0-9-]+$/),z.string().max(4096)),font:z.string().max(4096),rootSize:z.string().max(32),locale:z.enum(['zh','en']).optional()})
 const windowRequest=z.discriminatedUnion('action',[
   z.object({action:z.literal('open'),client:z.string().uuid(),session:z.string().min(1).max(240),id:z.string().uuid(),appearance:appearanceSchema,office:z.boolean().optional()}),
   z.object({action:z.literal('dock-open'),client:z.string().uuid(),id:z.string().uuid(),destination:z.enum(['main','sidebar']).optional()}),

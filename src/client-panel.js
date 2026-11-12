@@ -1,3 +1,4 @@
+import { l as uiText, useLibraryLocale } from './i18n.js';
 export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBinding, quote, publish, views, pool, css, kind, type, t, ui,SettingsButton}) {
   const h = React.createElement
   const panelId = 'moki-library'
@@ -55,7 +56,7 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
         }
         await new Promise(resolve=>setTimeout(resolve,90))
       }
-      throw new Error('请先在 DSH 选择工作区或打开对话')
+      throw new Error(uiText("请先在 DSH 选择工作区或打开对话"))
     } catch (error) { ctx.layout.selectPanel(panelId); pool.update(entry,{notice:error.message}) }
   }
   async function currentSession() {
@@ -65,7 +66,7 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
       if(id)return id
       await new Promise(resolve=>setTimeout(resolve,80))
     }
-    throw new Error('请在 DSH 选择工作区或打开对话后重试')
+    throw new Error(uiText("请在 DSH 选择工作区或打开对话后重试"))
   }
   function waitDocument(entry) {
     if(entry.state.documentReady && entry.host)return Promise.resolve()
@@ -75,7 +76,7 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
         if(entry.state.error){cleanup();reject(new Error(entry.state.error))}
         else if(entry.state.documentReady && entry.host){cleanup();resolve()}
       }
-      const timeout=setTimeout(()=>{cleanup();reject(new Error('DSH 未能载入此文件'))},18000)
+      const timeout=setTimeout(()=>{cleanup();reject(new Error(uiText("DSH 未能载入此文件")))},18000)
       entry.listeners.add(check);check()
     })
   }
@@ -95,6 +96,7 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
     await waitDocument(entry)
   })
   function Panel({mode,sessionId,binding,visible,renderSlot,SessionProvider,documentId}) {
+    useLibraryLocale(React)
     const entry = documentId?documentEntry(documentId):pool.entryFor(sessionId || browseId)
     if(visible)entry.chatSession=sessionId
     const state = React.useSyncExternalStore(React.useCallback(fn=>{entry.listeners.add(fn);return ()=>entry.listeners.delete(fn)},[entry]),()=>entry.state)
@@ -114,8 +116,8 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
       if (disabled) return
       if (actions.insertQuote(quoted)) {
         actions.persistDraft()
-        pool.update(entry,{notice:'已加入当前 DSH 对话草稿'})
-      } else pool.update(entry,{notice:'当前对话输入框暂时无法接收选区'})
+        pool.update(entry,{notice:uiText("已加入当前 DSH 对话草稿")})
+      } else pool.update(entry,{notice:uiText("当前对话输入框暂时无法接收选区")})
     },[actions,disabled,quoted,entry])
     React.useEffect(()=>{
       if (!visible || !target) return
@@ -126,37 +128,39 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
       pool.update(entry,{chat:false});entry.frame.focus();pool.send(entry,'focus-editor')
     }
     const main=mode==='main'
-    const switchLabel=main?'在侧边工作区打开':'在主窗口打开'
+    const switchLabel=main?uiText("在侧边工作区打开"):uiText("在主窗口打开")
     return h('section',{className:'ml-panel','data-ml-mode':mode,'data-file-open':state.previewing||undefined,onKeyDown:e=>{
       if (visible && !e.defaultPrevented && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.repeat && !e.nativeEvent.isComposing && (e.code==='KeyD' || e.key.toLowerCase()==='d')) {
         e.preventDefault();e.stopPropagation();pool.update(entry,{chat:true})
       }
-    },'aria-label':main?'MOKI资料库主窗口':'MOKI资料库侧边工作区'},
+    },'aria-label':main?uiText("MOKI资料库主窗口"):uiText("MOKI资料库侧边工作区")},
       h('div',{className:'ml-bar'},main?h('h1',null,t('title')):null,
         h('div',{className:'ml-actions'},
-          action(actionLabel(ui.IconPanelLeftOutlineRegular,main?'侧边工作区':'主窗口'),()=>{
+          action(actionLabel(ui.IconPanelLeftOutlineRegular,main?uiText("侧边工作区"):uiText("主窗口")),()=>{
             if(documentId){
               if(main)void currentSession().then(()=>{ctx.layout.selectPanel(null);ctx.sidebarRight.openResource(resourcePrefix+documentId,{kind:previewKind,destination:'sidebar'})}).catch(error=>pool.update(entry,{notice:error.message}))
               else {entry.inMain=true;selectMain(documentId)}
             } else if(main)void showSide(entry)
             else selectMain(null)
           },{'aria-label':switchLabel,title:switchLabel}),
-          action(actionLabel(added?ui.IconCheckOutlineRegular:ui.IconContextInjectionOutlineRegular,added?'已加入草稿':'选区加入对话'),add,{disabled,'aria-label':added?'已加入草稿':'选区加入对话',onMouseDown:e=>e.preventDefault(),title:target?(state.selection?.label||'请先选择资料或文字'):'请在 DSH 浮窗中新建或选择会话'}),
-          !state.previewing && action(actionLabel(ui.FishLogo,'DSH 对话'),()=>pool.update(entry,{chat:!state.chat}),{variant:'outline','aria-label':'DSH 对话',disabled:!state.ready,'aria-expanded':state.chat,'aria-keyshortcuts':'Alt+D',title:'DSH 对话 (Alt+D)'}),
+          action(actionLabel(added?ui.IconCheckOutlineRegular:ui.IconContextInjectionOutlineRegular,added?uiText("已加入草稿"):uiText("选区加入对话")),add,{disabled,'aria-label':added?uiText("已加入草稿"):uiText("选区加入对话"),onMouseDown:e=>e.preventDefault(),title:target?(state.selection?.label||uiText("请先选择资料或文字")):uiText("请在 DSH 浮窗中新建或选择会话")}),
+          !state.previewing && action(actionLabel(ui.FishLogo,uiText("DSH 对话")),()=>pool.update(entry,{chat:!state.chat}),{variant:'outline','aria-label':uiText("DSH 对话"),disabled:!state.ready,'aria-expanded':state.chat,'aria-keyshortcuts':'Alt+D',title:uiText("DSH 对话 (Alt+D)")}),
           !documentId && h(SettingsButton))),
-      state.error?h('div',{className:'ml-notice',role:'alert'},state.error,' ',action('重试',()=>pool.connect(entry))):null,
-      !state.error&&!state.ready?h('div',{className:'ml-notice',role:'status'},'正在打开资料库…'):null,
-      state.notice?h('div',{className:'ml-notice',role:'status'},state.notice,action(h(ui.IconCloseOutlineRegular,{size:14,'aria-hidden':true}),()=>pool.update(entry,{notice:''}),{'aria-label':'关闭提示'})):null,
+      state.error?h('div',{className:'ml-notice',role:'alert'},state.error,' ',action(uiText("重试"),()=>pool.connect(entry))):null,
+      !state.error&&!state.ready?h('div',{className:'ml-notice',role:'status'},uiText("正在打开资料库…")):null,
+      state.notice?h('div',{className:'ml-notice',role:'status'},state.notice,action(h(ui.IconCloseOutlineRegular,{size:14,'aria-hidden':true}),()=>pool.update(entry,{notice:''}),{'aria-label':uiText("关闭提示")})):null,
       h('div',{className:'ml-frame-holder',ref:host}),
       state.chat&&visible?h(Chat,{ctx,mode,slotMode:documentId && !main?'document':mode,currentId:sessionId,target,chat,SessionProvider,renderSlot,
         choose:id=>pool.update(entry,{chatTarget:id,chat:true}),selection,onClose:closeChat}):null)
   }
   function MainSeat({renderSlot,SessionProvider}) {
+    useLibraryLocale(React)
     const binding = useSnapshot(ctx.uiSession.adapter.current)
     const documentId=useSnapshot(mainSource)
     return h(Panel,{mode:'main',documentId,renderSlot,SessionProvider,visible:true,sessionId:binding.key,binding:binding.key?binding:undefined})
   }
   function SideSeat({sessionId,useTabInfo,renderSlot,SessionProvider}) {
+    useLibraryLocale(React)
     const current = useSnapshot(ctx.uiSession.adapter.current)
     const panel = useSnapshot(ctx.layout.panelInfo)
     const {tab}=useTabInfo()
@@ -183,7 +187,7 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
   ctx.slots.inject('main',()=>ctx.slots.register({name:'main',key:panelId,locale:'mokiLibrary',children:chatChildren('main')},MainSeat))
   ctx.slots.inject('sidebar.right.pane.tab',()=>ctx.slots.register({name:'sidebar.right.pane.tab',key:type,children:chatChildren('side')},SideSeat))
   ctx.effect(()=>ctx.sidebarRightTabs.register({id:previewType,kind:previewKind,patterns:[resourcePrefix+'**'],
-    canOpen:address=>address.startsWith(resourcePrefix),title:address=>names.get(address.slice(resourcePrefix.length)) || '文件预览',keepMounted:true}),'moki-library: file tabs')
+    canOpen:address=>address.startsWith(resourcePrefix),title:address=>names.get(address.slice(resourcePrefix.length)) || uiText("文件预览"),keepMounted:true}),'moki-library: file tabs')
   ctx.slots.inject('sidebar.right.pane.tab',()=>ctx.slots.register({name:'sidebar.right.pane.tab',key:previewType,children:chatChildren('document')},SideSeat))
   ctx.slots.inject('sidebar.right.pane.tab.title',()=>ctx.slots.register({name:'sidebar.right.pane.tab.title',key:type},({useTabInfo})=>h(React.Fragment,null,h(Icon),useTabInfo().tab.title)))
 }

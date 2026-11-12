@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 export type PreviewSelection = { selectedText?: string|null; selectedTextTruncated?: boolean; caret?: {start:number;end:number}|null; location?: Record<string,any>; [key:string]:any };
 const elementOf=(node:Node|null)=>node instanceof Element?node:node?.parentElement;
 const position=(text:string,offset:number)=>{const before=text.slice(0,offset),lines=before.split('\n');return {line:lines.length,column:lines.at(-1)!.length+1}};
@@ -8,7 +9,7 @@ function locationOf(element:Element){
 export function readPreviewSelection(root:HTMLElement|null,eventTarget?:EventTarget|null,sourceText?:string):PreviewSelection|undefined {
   if(!root)return;
   const active=document.activeElement;
-  if(active instanceof HTMLTextAreaElement && active.getAttribute('aria-label')==='资料文本编辑器' && root.contains(active)){
+  if(active instanceof HTMLTextAreaElement && active.getAttribute('aria-label')===uiText("资料文本编辑器") && root.contains(active)){
     // Textareas normalize Windows CRLF to LF. Translate the displayed caret back
     // to the actual draft, so a range never drifts by one character per line.
     const text=sourceText??active.value;
@@ -43,17 +44,17 @@ export function selectionLabel(location?:Record<string,any>){
   if(!location)return '';
   if(location.range)return [location.sheetName,location.range].filter(Boolean).join('!');
   if(location.path)return location.path;
-  if(location.region)return `区域 ${location.region.x},${location.region.y} · ${location.region.width}×${location.region.height}`;
+  if(location.region)return uiText`区域 ${location.region.x},${location.region.y} · ${location.region.width}×${location.region.height}`;
   if(location.kind==='slide'){
     const range=location.textSelection,ids=location.selectedElementIds||[];
-    return [location.page?`第 ${location.page} 页`:location.slideName||location.slideId,range?`${range.elementId} · 字符 ${range.startOffset}–${range.endOffset}`:ids.length?`${ids.length} 个对象`:''].filter(Boolean).join(' · ');
+    return [location.page?uiText`第 ${location.page} 页`:location.slideName||location.slideId,range?uiText`${range.elementId} · 字符 ${range.startOffset}–${range.endOffset}`:ids.length?uiText`${ids.length} 个对象`:''].filter(Boolean).join(' · ');
   }
-  if(location.kind==='document'&&location.startOffset!==undefined)return [location.page?`第 ${location.page} 页`:'',`字符 ${location.startOffset}–${location.endOffset??location.startOffset}`].filter(Boolean).join(' · ');
-  if(location.page)return `第 ${location.page}${location.endPage?'–'+location.endPage:''} 页`;
-  if(location.time!==undefined)return `${Number(location.time).toFixed(2)} 秒`;
-  if(location.line)return `第 ${location.line} 行${location.column!==undefined?`，第 ${location.column} 列`:''}`;
-  if(location.byteOffset!==undefined)return `分段 ${location.byteOffset} 字节起 · 字符 ${location.start??0}`;
-  if(location.start!==undefined)return `字符 ${location.start}–${location.end??location.start}`;
+  if(location.kind==='document'&&location.startOffset!==undefined)return [location.page?uiText`第 ${location.page} 页`:'',uiText`字符 ${location.startOffset}–${location.endOffset??location.startOffset}`].filter(Boolean).join(' · ');
+  if(location.page)return uiText`第 ${location.page}${location.endPage?'–'+location.endPage:''} 页`;
+  if(location.time!==undefined)return uiText`${Number(location.time).toFixed(2)} 秒`;
+  if(location.line)return uiText`第 ${location.line} 行${location.column!==undefined?uiText`，第 ${location.column} 列`:''}`;
+  if(location.byteOffset!==undefined)return uiText`分段 ${location.byteOffset} 字节起 · 字符 ${location.start??0}`;
+  if(location.start!==undefined)return uiText`字符 ${location.start}–${location.end??location.start}`;
   return '';
 }
 export function previewLocation(root:HTMLElement|null):Record<string,any>{

@@ -1,3 +1,4 @@
+import { l as uiText, useLibraryLocale } from './i18n.js';
 import {useChatLayout} from './chat-layout.js'
 
 export function createChatComponents(React,ui,{createPortal},conversationPhase) {
@@ -25,6 +26,7 @@ export function createChatComponents(React,ui,{createPortal},conversationPhase) 
     return {...(enabled && result.id===id?result:{}),retry}
   }
   function Conversation({sessionId,useSession,useSessions,useConversation,renderFactorySlot}) {
+    useLibraryLocale(React)
     const session=useSession(value=>value)
     const phase=conversationPhase(session,useConversation(value=>value))
     const blank=useSessions(state=>state.byId[sessionId]?.blank)
@@ -33,12 +35,14 @@ export function createChatComponents(React,ui,{createPortal},conversationPhase) 
     return renderFactorySlot('conversation.content',{variant:'embedded',phase:settling?'settling':hero?'hero':'active',hero})
   }
   function ToolButton({label,Glyph,onClick,disabled,pressed}) {
+    useLibraryLocale(React)
     return h(ui.Button,{type:'button',variant:'ghost',className:'ml-icon-button',title:label,'aria-label':label,
       'aria-expanded':pressed,disabled,onClick},h(Glyph,{size:16,'aria-hidden':true}))
   }
   // One session owns one native input editor. Present the existing conversation
   // in-place when the main chat and side workspace show the same session.
   function ExistingChat({scope,host,geometry,onClose,onEscape}) {
+    useLibraryLocale(React)
     const [content,setContent]=React.useState(null)
     const close=React.useRef(onClose),escape=React.useRef(onEscape)
     close.current=onClose;escape.current=onEscape
@@ -82,10 +86,11 @@ export function createChatComponents(React,ui,{createPortal},conversationPhase) 
     React.useLayoutEffect(place,[place,geometry])
     if(!content?.parentElement)return null
     return createPortal(h('div',{className:'ml-chat-return'},
-      h(ui.Button,{variant:'outline',onClick:()=>{close.current();requestAnimationFrame(()=>content.querySelector('[data-composer-input]')?.focus({preventScroll:true}))}},h(ui.FishLogo,{size:18}),'将浮窗对话放回主窗口')),content.parentElement)
+      h(ui.Button,{variant:'outline',onClick:()=>{close.current();requestAnimationFrame(()=>content.querySelector('[data-composer-input]')?.focus({preventScroll:true}))}},h(ui.FishLogo,{size:18}),uiText("将浮窗对话放回主窗口"))),content.parentElement)
   }
   const historyTime=new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})
   function Chat({ctx,mode,slotMode=mode,currentId,target,chat,choose,SessionProvider,renderSlot,selection,onClose,embeddedControls}) {
+    useLibraryLocale(React)
     const layout=useChatLayout(React,embeddedControls?null:mode),host=React.useRef(null)
     const sessionList=useSource(ctx.sessions.list),workspaceList=useSource(ctx.workspaces.list)
     const summary=sessionList.byId[target]
@@ -107,7 +112,7 @@ export function createChatComponents(React,ui,{createPortal},conversationPhase) 
     async function newChat() {
       if(creatingRef.current)return
       const group=groupFor(target) || groupFor(currentId) || [...groups].sort((a,b)=>(b.sessions[0]?.updatedAt||0)-(a.sessions[0]?.updatedAt||0))[0]
-      if(!group){setError('请先在 DSH 中打开工作区。');return}
+      if(!group){setError(uiText("请先在 DSH 中打开工作区。"));return}
       const request=++choice.current
       creatingRef.current=true;setCreating(true);setError('')
       try {
@@ -123,11 +128,11 @@ export function createChatComponents(React,ui,{createPortal},conversationPhase) 
       if(chat.reference?.binding.session.getSnapshot().running)return
       event.preventDefault();event.stopPropagation();onClose()
     }
-    const title=summary?.title?.trim() || '新会话'
+    const title=summary?.title?.trim() || uiText("新会话")
     function toggleHistory(){setQuery('');setError('');setHistory(!history)}
     React.useEffect(()=>{
       if(!embeddedControls)return
-      embeddedControls.report({title:target?title:'DSH 对话',history,creating})
+      embeddedControls.report({title:target?title:uiText("DSH 对话"),history,creating})
       const command=event=>{
         if(event.detail==='new')void newChat()
         if(event.detail==='history')toggleHistory()
@@ -136,30 +141,30 @@ export function createChatComponents(React,ui,{createPortal},conversationPhase) 
       window.addEventListener('moki:preview-chat-command',command)
       return ()=>window.removeEventListener('moki:preview-chat-command',command)
     })
-    const matches=history?groups.map(group=>({...group,sessions:group.sessions.filter(s=>((s.title||'新会话')+' '+group.workspace.title).toLowerCase().includes(query.trim().toLowerCase()))})).filter(g=>g.sessions.length):[]
-    return h('section',{ref:layout.ref,style:layout.style,className:'ml-dialog',role:embeddedControls?'region':'dialog','aria-label':embeddedControls?'DSH 会话':'DSH 编辑协作',onKeyDown:escape},
+    const matches=history?groups.map(group=>({...group,sessions:group.sessions.filter(s=>((s.title||uiText("新会话"))+' '+group.workspace.title).toLowerCase().includes(query.trim().toLowerCase()))})).filter(g=>g.sessions.length):[]
+    return h('section',{ref:layout.ref,style:layout.style,className:'ml-dialog',role:embeddedControls?'region':'dialog','aria-label':embeddedControls?uiText("DSH 会话"):uiText("DSH 编辑协作"),onKeyDown:escape},
       !embeddedControls && h('div',{className:'ml-chat-head'},
-        h('button',{type:'button',className:'ml-chat-move','aria-label':'移动 DSH 浮窗',title:'拖动移动，方向键微调',...layout.handle('move')},
-          h(ui.FishLogo,{size:22,'aria-hidden':true}),h('strong',{title},target?title:'DSH 对话')),
-        h(ToolButton,{label:'新建会话',Glyph:ui.IconNewChatOutlineRegular,disabled:creating,onClick:newChat}),
-        h(ToolButton,{label:'历史会话',Glyph:ui.IconClockOutlineRegular,pressed:history,onClick:toggleHistory}),
-        h(ToolButton,{label:'关闭 DSH 浮窗',Glyph:ui.IconCloseOutlineRegular,onClick:onClose})),
-      selection && h('div',{className:'ml-selection-line',title:selection.label},h(ui.IconContextInjectionOutlineRegular,{size:14}),'资料库选区',h('span',null,selection.label)),
+        h('button',{type:'button',className:'ml-chat-move','aria-label':uiText("移动 DSH 浮窗"),title:uiText("拖动移动，方向键微调"),...layout.handle('move')},
+          h(ui.FishLogo,{size:22,'aria-hidden':true}),h('strong',{title},target?title:uiText("DSH 对话"))),
+        h(ToolButton,{label:uiText("新建会话"),Glyph:ui.IconNewChatOutlineRegular,disabled:creating,onClick:newChat}),
+        h(ToolButton,{label:uiText("历史会话"),Glyph:ui.IconClockOutlineRegular,pressed:history,onClick:toggleHistory}),
+        h(ToolButton,{label:uiText("关闭 DSH 浮窗"),Glyph:ui.IconCloseOutlineRegular,onClick:onClose})),
+      selection && h('div',{className:'ml-selection-line',title:selection.label},h(ui.IconContextInjectionOutlineRegular,{size:14}),uiText("资料库选区"),h('span',null,selection.label)),
       error && h('div',{className:'ml-chat-error',role:'alert'},error),
       history?h('div',{className:'ml-history'},
-        h('label',{className:'ml-history-search'},h(ui.IconSearchOutlineRegular,{size:16}),h('input',{ref:search,value:query,onChange:e=>setQuery(e.target.value),placeholder:'搜索历史会话','aria-label':'搜索历史会话'})),
+        h('label',{className:'ml-history-search'},h(ui.IconSearchOutlineRegular,{size:16}),h('input',{ref:search,value:query,onChange:e=>setQuery(e.target.value),placeholder:uiText("搜索历史会话"),'aria-label':uiText("搜索历史会话")})),
         h('div',{className:'ml-history-list'},matches.length?matches.map(({workspace,sessions})=>h('section',{key:workspace.workspaceId},
-          h('h3',null,workspace.title==='default-workspace'?'默认工作区':workspace.title),
+          h('h3',null,workspace.title==='default-workspace'?uiText("默认工作区"):workspace.title),
           sessions.map(s=>h('button',{type:'button',key:s.id,'aria-current':s.id===target?'true':undefined,
-            onClick:()=>{choice.current++;choose(s.id);setHistory(false);setError('')}},h('span',null,s.title?.trim()||'新会话'),Number.isFinite(s.updatedAt)?h('time',null,historyTime.format(s.updatedAt)):null,s.id===target?h(ui.IconCheckOutlineRegular,{size:15}):null)))):h('p',{role:'status'},query?'没有匹配的会话':'暂无历史会话'))):
+            onClick:()=>{choice.current++;choose(s.id);setHistory(false);setError('')}},h('span',null,s.title?.trim()||uiText("新会话")),Number.isFinite(s.updatedAt)?h('time',null,historyTime.format(s.updatedAt)):null,s.id===target?h(ui.IconCheckOutlineRegular,{size:15}):null)))):h('p',{role:'status'},query?uiText("没有匹配的会话"):uiText("暂无历史会话")))):
       h('div',{className:'ml-native-host',ref:host},
-        !target?h('div',{className:'ml-chat-state'},h(ui.FishLogo,{size:34}),h(ui.Button,{variant:'outline',onClick:newChat,disabled:creating},'新建会话')):
-        chat.error?h('div',{className:'ml-chat-state',role:'alert'},chat.error,h(ui.Button,{variant:'outline',onClick:chat.retry},'重试')):
-        !chat.reference?h('div',{className:'ml-chat-state',role:'status'},'正在打开会话…'):
+        !target?h('div',{className:'ml-chat-state'},h(ui.FishLogo,{size:34}),h(ui.Button,{variant:'outline',onClick:newChat,disabled:creating},uiText("新建会话"))):
+        chat.error?h('div',{className:'ml-chat-state',role:'alert'},chat.error,h(ui.Button,{variant:'outline',onClick:chat.retry},uiText("重试"))):
+        !chat.reference?h('div',{className:'ml-chat-state',role:'status'},uiText("正在打开会话…")):
         borrowed?h(ExistingChat,{scope:target,host,geometry:layout.style,onClose,onEscape:escape}):
         h(SessionProvider,{session:chat.reference,key:target},renderSlot('moki-library.chat.'+slotMode,{}))),
       !embeddedControls && ['n','s','e','w','nw','ne','sw','se'].map(edge=>h('button',{type:'button',key:edge,className:'ml-chat-resize','data-edge':edge,
-        tabIndex:edge==='se'?0:-1,'aria-hidden':edge!=='se'||undefined,'aria-label':'调整 DSH 浮窗大小',title:'拖动调整大小，方向键微调',...layout.handle(edge)})))
+        tabIndex:edge==='se'?0:-1,'aria-hidden':edge!=='se'||undefined,'aria-label':uiText("调整 DSH 浮窗大小"),title:uiText("拖动调整大小，方向键微调"),...layout.handle(edge)})))
   }
   return {Chat,Conversation,useChatBinding}
 }

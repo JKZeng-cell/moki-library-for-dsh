@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 import {useEffect,useState} from 'react';
 import {parsePresentation,ReactPptxViewer,PptxViewerError,type ReactPptxViewerProps,type ParsedPresentation} from '@extend-ai/react-pptx';
 import {restorePowerPointPreviewAssets} from '../../shared/powerpoint-preview-assets.js';
@@ -29,6 +30,6 @@ export function PowerPointCompleteViewer(props:ReactPptxViewerProps){
   const error=state?.source===source?state.error:undefined;
   useEffect(()=>{if(error)props.onError?.(error);},[error,props.onError]);
   if(error)return props.renderError?.(error) ?? <p role="alert">{error.message}</p>;
-  if(state?.source!==source||!state.parsed)return props.renderLoading?.() ?? <p role="status">正在解析 PowerPoint 文件</p>;
+  if(state?.source!==source||!state.parsed)return props.renderLoading?.() ?? <p role="status">{uiText("正在解析 PowerPoint 文件")}</p>;
   return <ReactPptxViewer {...props} source={state.parsed}/>;
 }

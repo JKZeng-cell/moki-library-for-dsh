@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 import type { ComponentPropsWithRef, HTMLAttributes, ReactNode } from "react";
 import { LoaderCircle } from "lucide-react";
 
@@ -14,7 +15,7 @@ export function Button({ variant = "secondary", size = "regular", loading = fals
   return <button {...props} type={type} disabled={disabled || loading} aria-busy={loading || undefined}
     data-variant={variant} data-size={size} className={`moki-ui-button ${className}`}>
     <span className="moki-ui-button-content" style={loading ? { visibility: "hidden" } : undefined} aria-hidden={loading || undefined}>{children}</span>
-    {loading ? <span className="moki-ui-button-progress"><LoaderCircle size={16} className="motion-safe:animate-spin" aria-hidden="true" /><span className={loadingLabel ? "" : "sr-only"}>{loadingLabel ?? "处理中"}</span></span> : null}
+    {loading ? <span className="moki-ui-button-progress"><LoaderCircle size={16} className="motion-safe:animate-spin" aria-hidden="true" /><span className={loadingLabel ? "" : "sr-only"}>{loadingLabel ?? uiText("处理中")}</span></span> : null}
   </button>;
 }
 

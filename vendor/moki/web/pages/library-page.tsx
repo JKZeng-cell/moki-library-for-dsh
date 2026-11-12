@@ -1,3 +1,4 @@
+import { l as uiText, getLocale, intlLocale, subscribeLocale } from '../../../../src/i18n.js';
 import { PageFeedback } from "../components/page-feedback.js";
 import { Select as PermissionSelect } from "../components/ui-controls.js";
 import { usePageState } from '../lib/page-state.js';
@@ -50,6 +51,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type ChangeEvent,
   type DragEvent,
@@ -104,23 +106,23 @@ import {
 
 type CreateMode = "folder" | "mapping" | "file";
 const LIBRARY_FILE_TYPES = [
-  { format: "markdown", label: "Markdown 文档", icon: FileText },
-  { format: "docx", label: "Word 文档", icon: FileText },
-  { format: "xlsx", label: "Excel 表格", icon: FileSpreadsheet },
-  { format: "csv", label: "CSV 表格", icon: FileSpreadsheet },
-  { format: "pptx", label: "PowerPoint 演示文稿", icon: Presentation },
-  { format: "univer", label: "Univer 多组件文件", icon: Grid2X2 },
+  { format: "markdown", get label() { return uiText("Markdown 文档"); }, icon: FileText },
+  { format: "docx", get label() { return uiText("Word 文档"); }, icon: FileText },
+  { format: "xlsx", get label() { return uiText("Excel 表格"); }, icon: FileSpreadsheet },
+  { format: "csv", get label() { return uiText("CSV 表格"); }, icon: FileSpreadsheet },
+  { format: "pptx", get label() { return uiText("PowerPoint 演示文稿"); }, icon: Presentation },
+  { format: "univer", get label() { return uiText("Univer 多组件文件"); }, icon: Grid2X2 },
 ] as const;
 type CardDropMode = "before" | "inside" | "after";
 type LibraryViewMode = "grid" | "list";
 type LibraryContextMenu = { x: number; y: number; item?: ResourceLibraryItem };
 const FOLDER_COLORS = [
-  { id: "violet", label: "紫色", background: "#ebeafd", foreground: "#625bc5", darkBackground: "#2b2948", darkForeground: "#aaa4ff" },
-  { id: "blue", label: "蓝色", background: "#e8f0ff", foreground: "#4c76c8", darkBackground: "#21334d", darkForeground: "#8fb9ff" },
-  { id: "green", label: "绿色", background: "#e4f6f2", foreground: "#259783", darkBackground: "#1b3b38", darkForeground: "#68d1b8" },
-  { id: "amber", label: "黄色", background: "#fff2df", foreground: "#b97625", darkBackground: "#463421", darkForeground: "#f6b75a" },
-  { id: "rose", label: "粉色", background: "#ffe8ee", foreground: "#cf5b78", darkBackground: "#452b3b", darkForeground: "#ef8eac" },
-  { id: "slate", label: "灰色", background: "#edf0f5", foreground: "#697386", darkBackground: "#343c4b", darkForeground: "#bec9dc" },
+  { id: "violet", get label() { return uiText("紫色"); }, background: "#ebeafd", foreground: "#625bc5", darkBackground: "#2b2948", darkForeground: "#aaa4ff" },
+  { id: "blue", get label() { return uiText("蓝色"); }, background: "#e8f0ff", foreground: "#4c76c8", darkBackground: "#21334d", darkForeground: "#8fb9ff" },
+  { id: "green", get label() { return uiText("绿色"); }, background: "#e4f6f2", foreground: "#259783", darkBackground: "#1b3b38", darkForeground: "#68d1b8" },
+  { id: "amber", get label() { return uiText("黄色"); }, background: "#fff2df", foreground: "#b97625", darkBackground: "#463421", darkForeground: "#f6b75a" },
+  { id: "rose", get label() { return uiText("粉色"); }, background: "#ffe8ee", foreground: "#cf5b78", darkBackground: "#452b3b", darkForeground: "#ef8eac" },
+  { id: "slate", get label() { return uiText("灰色"); }, background: "#edf0f5", foreground: "#697386", darkBackground: "#343c4b", darkForeground: "#bec9dc" },
 ] as const;
 type FolderColor = (typeof FOLDER_COLORS)[number]["id"];
 
@@ -154,17 +156,13 @@ type LibrarySelectionRect = {
   selected: Set<string>;
 };
 
-function boxSelectionPoint(event: ReactPointerEvent<HTMLDivElement>) {
+function boxSelectionPoint(event: ReactPointerEvent<HTMLElement>) {
   const surface = event.currentTarget;
   const rect = surface.getBoundingClientRect();
   const left = rect.left + surface.clientLeft, top = rect.top + surface.clientTop;
-  const header = surface.querySelector(".library-list-header");
-  const contentTop = Math.max(top, header?.getBoundingClientRect().bottom ?? top);
   return {
-    x: surface.scrollLeft + Math.min(surface.clientWidth, Math.max(0, event.clientX - left)),
-    y: surface.scrollTop + Math.min(surface.clientHeight, Math.max(contentTop, event.clientY) - top),
-    originX: left - surface.scrollLeft,
-    originY: top - surface.scrollTop,
+    x: Math.min(left + surface.clientWidth, Math.max(left, event.clientX)),
+    y: Math.min(top + surface.clientHeight, Math.max(top, event.clientY)),
   };
 }
 export type ResourceFolderTreeNode = {
@@ -333,7 +331,7 @@ function ResourceTagEditor({
   });
   return (
     <div className="library-tag-editor">
-      <label htmlFor="library-tag-input">标签</label>
+      <label htmlFor="library-tag-input">{uiText("标签")}</label>
       <div className="library-tag-field" onClick={event => {
         if (event.target === event.currentTarget) event.currentTarget.querySelector("input")?.focus();
       }}>
@@ -346,7 +344,7 @@ function ResourceTagEditor({
             <span className="max-w-40 truncate">{resourceTagLabel(tag)}</span>
             <button
               type="button"
-              aria-label={`删除标签 ${tag}`}
+              aria-label={uiText`删除标签 ${tag}`}
               onClick={() =>
                 onTagsChange(tags.filter((value) => value !== tag))
               }
@@ -357,24 +355,22 @@ function ResourceTagEditor({
           </span>
         ))}
         <input
-          id="library-tag-input" aria-label="输入标签" aria-describedby="library-tag-help"
+          id="library-tag-input" aria-label={uiText("输入标签")} aria-describedby="library-tag-help"
           value={draft}
           disabled={tags.length >= 20}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={tags.length ? "继续输入标签" : "输入标签后按回车"}
+          placeholder={tags.length ? uiText("继续输入标签") : uiText("输入标签后按回车")}
           className="library-tag-input"
         />
       </div>
-      <span id="library-tag-help" className="library-tag-help">
-        最多可添加 20 个标签。
-      </span>
+      <span id="library-tag-help" className="library-tag-help">{uiText("最多可添加 20 个标签。")}</span>
       {suggestions.length ? (
         <div
-          aria-label="历史标签快捷选择"
+          aria-label={uiText("历史标签快捷选择")}
           className="library-tag-history"
         >
-          <span>历史标签</span>
+          <span>{uiText("历史标签")}</span>
           {suggestions.slice(0, 12).map((tag) => (
             <span
               key={tag}
@@ -384,14 +380,14 @@ function ResourceTagEditor({
             <button
               key={tag}
               type="button"
-              aria-label={`添加历史标签 ${tag}`}
+              aria-label={uiText`添加历史标签 ${tag}`}
               disabled={tags.length >= 20}
               onClick={() => addTags([tag])}
               className="library-history-tag-button"
             >
               + {resourceTagLabel(tag)}
             </button>
-            <button type="button" aria-label={`删除历史标签 ${tag}`} title="从历史标签中删除" onClick={() => onDeleteHistory(tag)} className="library-chip-remove"><X size={11}/></button>
+            <button type="button" aria-label={uiText`删除历史标签 ${tag}`} title={uiText("从历史标签中删除")} onClick={() => onDeleteHistory(tag)} className="library-chip-remove"><X size={11}/></button>
             </span>
           ))}
         </div>
@@ -528,7 +524,7 @@ export function resourceFolderPathLabel(
     seen.add(parent.id);
     parentId = parent.parentId;
   }
-  return `资料库 / ${names.join(" / ")}`;
+  return uiText`资料库 / ${names.join(" / ")}`;
 }
 
 export function buildResourceFolderTree(
@@ -729,38 +725,38 @@ export function resourcePreviewKind(
 export function resourceTypeLabel(
   item: Pick<ResourceLibraryItem, "kind" | "name" | "target">,
 ): string {
-  if (item.kind === "folder") return "虚拟文件夹";
-  if (item.kind === "local_folder") return "本地文件夹";
+  if (item.kind === "folder") return uiText("虚拟文件夹");
+  if (item.kind === "local_folder") return uiText("本地文件夹");
   switch (resourceFileCategory(item)) {
     case "image":
-      return "图片";
+      return uiText("图片");
     case "video":
-      return "视频";
+      return uiText("视频");
     case "audio":
-      return "音频";
+      return uiText("音频");
     case "document":
-      return "文档";
+      return uiText("文档");
     case "spreadsheet":
-      return "表格";
+      return uiText("表格");
     case "presentation":
-      return "演示文稿";
+      return uiText("演示文稿");
     case "archive":
-      return "压缩包";
+      return uiText("压缩包");
     case "code":
-      return "代码";
+      return uiText("代码");
     case "link":
-      return "在线文件";
+      return uiText("在线文件");
     default:
-      return "文件";
+      return uiText("文件");
   }
 }
 
 export function resourceTagLabel(tag: string): string {
-  if (tag === ASSISTANT_TASK_DIRECTORY_TAG || tag === ASSISTANT_TASK_SPACE_TAG) return "任务空间";
-  if (tag === ASSISTANT_DOWNLOAD_DIRECTORY_TAG) return "下载";
-  if (tag === `${ASSISTANT_TASK_SPACE_SOURCE_TAG_PREFIX}created`) return "新建";
-  if (tag === `${ASSISTANT_TASK_SPACE_SOURCE_TAG_PREFIX}local`) return "本地";
-  if (tag === `${ASSISTANT_TASK_SPACE_SOURCE_TAG_PREFIX}library`) return "资料库";
+  if (tag === ASSISTANT_TASK_DIRECTORY_TAG || tag === ASSISTANT_TASK_SPACE_TAG) return uiText("任务空间");
+  if (tag === ASSISTANT_DOWNLOAD_DIRECTORY_TAG) return uiText("下载");
+  if (tag === `${ASSISTANT_TASK_SPACE_SOURCE_TAG_PREFIX}created`) return uiText("新建");
+  if (tag === `${ASSISTANT_TASK_SPACE_SOURCE_TAG_PREFIX}local`) return uiText("本地");
+  if (tag === `${ASSISTANT_TASK_SPACE_SOURCE_TAG_PREFIX}library`) return uiText("资料库");
   return tag;
 }
 
@@ -772,16 +768,16 @@ function isFolder(item: ResourceLibraryItem) {
   return item.kind === "folder" || item.kind === "local_folder";
 }
 
-const resourceTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
+const timeFormatters = Object.fromEntries(["zh-CN", "en-US"].map(locale => [locale, new Intl.DateTimeFormat(locale, {
   year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-});
-const resourceTextOrder = new Intl.Collator("zh-CN", { numeric: true, sensitivity: "base" });
+})]));
+const textOrders = Object.fromEntries(["zh-CN", "en-US"].map(locale => [locale, new Intl.Collator(locale, { numeric: true, sensitivity: "base" })]));
 
 export function formatResourceTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return resourceTimeFormatter.format(date);
+  return timeFormatters[intlLocale()].format(date);
 }
 
 export function sortResourceLibraryItems(
@@ -794,7 +790,7 @@ export function sortResourceLibraryItems(
     LibrarySortDirection,
   ];
   const order = direction === "desc" ? -1 : 1;
-  const compareText = resourceTextOrder.compare;
+  const compareText = textOrders[intlLocale()].compare;
   const compareOptionalText = (
     left: string | null | undefined,
     right: string | null | undefined,
@@ -819,7 +815,8 @@ export function sortResourceLibraryItems(
   };
   return [...items].sort((left, right) => {
     const folderOrder = Number(isFolder(right)) - Number(isFolder(left));
-    if (folderOrder) return folderOrder;
+    // Name and date sorts compare every entry on the chosen dimension.
+    if ((field === "type" || field === "path") && folderOrder) return folderOrder;
     const result =
       field === "name"
         ? order * compareText(left.name, right.name)
@@ -851,19 +848,19 @@ export function toggleLibrarySortMode(
 export function resourceItemTooltip(item: ResourceLibraryItem): string {
   const kindLabel =
     item.kind === "folder"
-      ? "虚拟文件夹"
+      ? uiText("虚拟文件夹")
       : item.kind === "local_folder"
-        ? "本地文件夹映射"
+        ? uiText("本地文件夹映射")
         : item.kind === "url"
-          ? "在线文件"
-          : "本地文件";
+          ? uiText("在线文件")
+          : uiText("本地文件");
   return [
     item.name,
-    `类型：${kindLabel}`,
-    item.target ? `位置：${item.target}` : "",
-    `文件修改：${formatResourceTime(item.fileModifiedAt ?? item.fileCreatedAt)}`,
-    `添加到资料库：${formatResourceTime(item.createdAt)}`,
-    item.tags.length ? `标签：${resourceTagLabels(item.tags).join("、")}` : "",
+    uiText`类型：${kindLabel}`,
+    item.target ? uiText`位置：${item.target}` : "",
+    uiText`文件修改：${formatResourceTime(item.fileModifiedAt ?? item.fileCreatedAt)}`,
+    uiText`添加到资料库：${formatResourceTime(item.createdAt)}`,
+    item.tags.length ? uiText`标签：${resourceTagLabels(item.tags).join("、")}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -1076,6 +1073,7 @@ export function displayNameFromTarget(
 }
 
 export function LibraryPage() {
+  const locale = useSyncExternalStore(subscribeLocale, getLocale, getLocale);
   const [items, setItems] = useState<ResourceLibraryItem[]>([]);
   const [indexStatuses, setIndexStatuses] = useState<
     Record<
@@ -1258,7 +1256,7 @@ export function LibraryPage() {
   useEffect(() => {
     void refresh()
       .catch((error) =>
-        setMessage(error instanceof Error ? error.message : "资料库加载失败"),
+        setMessage(error instanceof Error ? error.message : uiText("资料库加载失败")),
       )
       .finally(() => setInitialLoading(false));
   }, [refresh]);
@@ -1269,7 +1267,7 @@ export function LibraryPage() {
     );
     quickEntryItemIdRef.current = "";
     if (!item) {
-      setMessage("快速入口对应的资料库内容已不存在");
+      setMessage(uiText("快速入口对应的资料库内容已不存在"));
       return;
     }
     if (isFolder(item)) setFolderId(item.id);
@@ -1305,7 +1303,7 @@ export function LibraryPage() {
     }
   }, [folderId, initialLoading, items]);
   const current = useMemo(() => folderId ? items.find(item => item.id === folderId) : undefined, [folderId, items]);
-  const currentPath = useMemo(() => resourceLibraryPath(current, items), [current, items]);
+  const currentPath = useMemo(() => resourceLibraryPath(current, items), [current, items, locale]);
   const localFolderId = current?.kind === "local_folder" ? current.id : undefined;
   useEffect(() => {
     if (!localFolderId) return;
@@ -1540,7 +1538,7 @@ export function LibraryPage() {
           .join("\n").toLocaleLowerCase("zh-CN");
         return { item, labels, corpus };
       }),
-    [folderId, items, sortMode],
+    [folderId, items, sortMode, locale],
   );
   const availableTags = useMemo(
     () =>
@@ -1579,7 +1577,7 @@ export function LibraryPage() {
           "zh-CN",
         ),
       );
-  }, [folderOptions, items, moveDialogItems]);
+  }, [folderOptions, items, moveDialogItems, locale]);
   const moveFolderTree = useMemo(
     () => buildResourceFolderTree(moveFolderOptions),
     [moveFolderOptions],
@@ -1638,7 +1636,7 @@ export function LibraryPage() {
     }
     publishWorkbenchSelectionContext({
       source: "library",
-      label: `资料库已选 ${selectedItems.length} 项`,
+      label: uiText`资料库已选 ${selectedItems.length} 项`,
       itemCount: selectedItems.length,
       content: JSON.stringify(
         {
@@ -1698,8 +1696,7 @@ export function LibraryPage() {
   function createMenuItems() {
     return <>
       <button type="button" role="menuitem" className="library-menu-item" onClick={() => startCreate("folder")}>
-        <FolderPlus size={16} aria-hidden="true" />新建文件夹
-      </button>
+        <FolderPlus size={16} aria-hidden="true" />{uiText("新建文件夹")}</button>
       <div role="separator" className="moki-menu-divider" />
       {LIBRARY_FILE_TYPES.map(({ format, label, icon: Icon }) => (
         <button key={format} type="button" role="menuitem" className="library-menu-item" onClick={() => startCreate("file", format)}>
@@ -1775,7 +1772,7 @@ export function LibraryPage() {
             {hasChildren ? (
               <button
                 type="button"
-                aria-label={`${expanded ? "收起" : "展开"}${node.item.name}`}
+                aria-label={`${expanded ? uiText("收起") : uiText("展开")}${node.item.name}`}
                 onClick={() => toggleMoveFolder(node.item.id)}
                 className={`grid size-7 shrink-0 place-items-center rounded-lg ${selected ? "hover:bg-white/15" : "hover:bg-[#e9e8f8]"}`}
               >
@@ -1818,14 +1815,18 @@ export function LibraryPage() {
     });
   }
 
-  function beginBoxSelection(event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 || !event.isPrimary || busy) return;
+  function beginBoxSelection(event: ReactPointerEvent<HTMLElement>) {
+    if (event.button !== 0 || !event.isPrimary || busy || previewItem) return;
     if (selectionGesture.current && selectionGesture.current.pointerId !== event.pointerId) return;
     const target = event.target;
-    if (!(target instanceof Element) || target.closest("button,label,input,select,textarea,[contenteditable='true'],[role='separator'],.library-list-header")) return;
+    if (!(target instanceof Element) || target.closest("button,label,input,select,textarea,a,[contenteditable='true'],[role='separator'],[role='dialog'],.library-list-header,.dsh-library-commandbar,.dsh-library-tags,.dsh-selection-toolbar")) return;
     const row = target.closest("article[data-resource-id]");
     if (row && (viewMode !== "list" || event.pointerType !== "mouse" || event.altKey || target.closest(".library-list-icon,[data-resource-name]"))) return;
     const surface = event.currentTarget;
+    const scroll = selectionSurfaceRef.current;
+    if (!scroll) return;
+    const scrollBounds = scroll.getBoundingClientRect();
+    if (target === scroll && (event.clientX >= scrollBounds.left + scroll.clientLeft + scroll.clientWidth || event.clientY >= scrollBounds.top + scroll.clientTop + scroll.clientHeight)) return;
     if (target === surface) {
       const bounds = surface.getBoundingClientRect();
       if (event.clientX >= bounds.left + surface.clientLeft + surface.clientWidth ||
@@ -1842,10 +1843,10 @@ export function LibraryPage() {
     };
   }
 
-  function updateBoxSelection(event: ReactPointerEvent<HTMLDivElement>, commit = false) {
+  function updateBoxSelection(event: ReactPointerEvent<HTMLElement>, commit = false) {
     const gesture = selectionGesture.current;
     if (gesture?.pointerId !== event.pointerId) return;
-    const { x, y, originX, originY } = boxSelectionPoint(event);
+    const { x, y } = boxSelectionPoint(event);
     const { startX, startY } = gesture;
     if (gesture.pendingRowClick) {
       if (commit) {
@@ -1857,17 +1858,21 @@ export function LibraryPage() {
       event.currentTarget.setPointerCapture(event.pointerId);
       gesture.pendingRowClick = false;
     }
+    const scroll = selectionSurfaceRef.current;
+    if (!scroll) return;
+    const viewport = scroll.getBoundingClientRect();
+    const contentTop = Math.max(viewport.top, scroll.querySelector('.library-list-header')?.getBoundingClientRect().bottom ?? viewport.top);
     const bounds = {
-      left: Math.min(startX, x) + originX,
-      top: Math.min(startY, y) + originY,
-      right: Math.max(startX, x) + originX,
-      bottom: Math.max(startY, y) + originY,
+      left: Math.max(Math.min(startX, x), viewport.left),
+      top: Math.max(Math.min(startY, y), contentTop),
+      right: Math.min(Math.max(startX, x), viewport.left + scroll.clientWidth),
+      bottom: Math.min(Math.max(startY, y), viewport.top + scroll.clientHeight),
     };
     const selected = new Set(gesture.base);
     for (const element of event.currentTarget.querySelectorAll<HTMLElement>(
       "[data-resource-id]",
     )) {
-      if (librarySelectionIntersects(bounds, element.getBoundingClientRect()))
+      if (bounds.right > bounds.left && bounds.bottom > bounds.top && librarySelectionIntersects(bounds, element.getBoundingClientRect()))
         selected.add(element.dataset.resourceId!);
     }
     // Keep the bulk toolbar and the item positions stable until the gesture commits.
@@ -1880,7 +1885,7 @@ export function LibraryPage() {
     }
   }
 
-  function cancelBoxSelection(event: ReactPointerEvent<HTMLDivElement>) {
+  function cancelBoxSelection(event: ReactPointerEvent<HTMLElement>) {
     if (selectionGesture.current?.pointerId !== event.pointerId) return;
     if (event.type === "lostpointercapture" && event.currentTarget.hasPointerCapture(event.pointerId)) return;
     selectionGesture.current = null;
@@ -1929,9 +1934,9 @@ export function LibraryPage() {
       await navigator.clipboard.writeText(resourceLibraryPath(item, items));
       copiedItemRef.current = item;
       setLibraryClipboard(undefined);
-      setMessage(`已复制“${item.name}”的路径`);
+      setMessage(uiText`已复制“${item.name}”的路径`);
     } catch {
-      setMessage("无法写入系统剪贴板，请检查客户端剪贴板权限");
+      setMessage(uiText("无法写入系统剪贴板，请检查客户端剪贴板权限"));
     }
     setCardMenuId("");
     setContextMenu(undefined);
@@ -1942,15 +1947,15 @@ export function LibraryPage() {
     setCardMenuId("");
     const targets = operationItems(item);
     if (targets.some(target => target.kind !== "local_file" || !target.target)) {
-      setMessage("请选择本地文件");
+      setMessage(uiText("请选择本地文件"));
       return;
     }
     try {
       await copyLibraryFile(targets.map(target => target.id));
       setLibraryClipboard(undefined);
-      setMessage(targets.length === 1 ? `已复制文件“${item.name}”` : `已复制 ${targets.length} 个文件，可在资源管理器中粘贴`);
+      setMessage(targets.length === 1 ? uiText`已复制文件“${item.name}”` : uiText`已复制 ${targets.length} 个文件，可在资源管理器中粘贴`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "复制文件失败");
+      setMessage(error instanceof Error ? error.message : uiText("复制文件失败"));
     }
   }
 
@@ -1980,7 +1985,7 @@ export function LibraryPage() {
       setFolderColorMenu(undefined);
       setCardMenuId("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "文件夹颜色保存失败");
+      setMessage(error instanceof Error ? error.message : uiText("文件夹颜色保存失败"));
     }
   }
 
@@ -2000,7 +2005,7 @@ export function LibraryPage() {
         !desktop ||
         (folder ? !desktop.selectLocalFolder : !desktop.selectSavePath)
       ) {
-        setMessage("请在 MOKI 客户端中使用另存为");
+        setMessage(uiText("请在 MOKI 客户端中使用另存为"));
       }
       return;
     }
@@ -2015,11 +2020,11 @@ export function LibraryPage() {
       });
       setMessage(
         folder
-          ? `已另存为“${result.path}”（${result.files} 个文件）`
-          : `已另存为“${result.path}”`,
+          ? uiText`已另存为“${result.path}”（${result.files} 个文件）`
+          : uiText`已另存为“${result.path}”`,
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "资料另存为失败");
+      setMessage(error instanceof Error ? error.message : uiText("资料另存为失败"));
     } finally {
       setBusy(false);
     }
@@ -2032,7 +2037,7 @@ export function LibraryPage() {
       if (item.kind === "local_folder") await openResourceLibraryItem(item.id);
       else await revealResourceLibraryFolder(item.id);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "打开路径失败");
+      setMessage(error instanceof Error ? error.message : uiText("打开路径失败"));
     }
   }
 
@@ -2045,7 +2050,7 @@ export function LibraryPage() {
         setIndexStatuses((current) => ({ ...current, [item.id]: status })),
       )
       .catch((error) =>
-        setMessage(error instanceof Error ? error.message : "索引启动失败"),
+        setMessage(error instanceof Error ? error.message : uiText("索引启动失败")),
       );
   }
 
@@ -2057,7 +2062,7 @@ export function LibraryPage() {
     const created = await createResourceLibraryItem({
       parentId,
       kind: source.kind,
-      name: topLevel ? `${source.name} 副本` : source.name,
+      name: topLevel ? uiText`${source.name} 副本` : source.name,
       ...(source.target ? { target: source.target } : {}),
       tags: source.tags,
       ...(isFolder(source) ? { folderColor: source.folderColor ?? null } : {}),
@@ -2081,12 +2086,12 @@ export function LibraryPage() {
     setContextMenu(undefined);
     if (mode === "copy" && targets.every(target=>target.kind === "local_file")) {
       void copyLibraryFile(targets.map(target=>target.id))
-        .then(()=>setMessage(`已复制 ${targets.length} 个文件，可以粘贴到其他应用`))
-        .catch(error=>setMessage(`已复制资料库条目，系统文件复制失败：${error.message}`));
+        .then(()=>setMessage(uiText`已复制 ${targets.length} 个文件，可以粘贴到其他应用`))
+        .catch(error=>setMessage(uiText`已复制资料库条目，系统文件复制失败：${error.message}`));
       return;
     }
     setMessage(
-      `已${mode === "cut" ? "剪切" : "复制"} ${targets.length} 项，可在目标目录粘贴`,
+      uiText`已${mode === "cut" ? uiText("剪切") : uiText("复制")} ${targets.length} 项，可在目标目录粘贴`,
     );
   }
 
@@ -2111,10 +2116,10 @@ export function LibraryPage() {
         });
       }
       await refresh();
-      setMessage(`已通过粘贴添加 ${resources.length} 项资料`);
+      setMessage(uiText`已通过粘贴添加 ${resources.length} 项资料`);
       return true;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "剪贴板资料添加失败");
+      setMessage(error instanceof Error ? error.message : uiText("剪贴板资料添加失败"));
       return false;
     } finally {
       setBusy(false);
@@ -2138,11 +2143,11 @@ export function LibraryPage() {
     try {
       clipboardText = (await navigator.clipboard.readText()).trim();
     } catch {
-      return setMessage("剪贴板中没有可添加的文件、文件夹或链接");
+      return setMessage(uiText("剪贴板中没有可添加的文件、文件夹或链接"));
     }
     const resources = clipboardTextResources(clipboardText);
     if (!resources.length)
-      return setMessage("剪贴板中没有可添加的文件、文件夹或链接");
+      return setMessage(uiText("剪贴板中没有可添加的文件、文件夹或链接"));
     return addPastedResources(resources, destinationParentId);
   }
 
@@ -2158,7 +2163,7 @@ export function LibraryPage() {
       );
       if (!sources.length) {
         setLibraryClipboard(undefined);
-        return setMessage("待粘贴的资料已不存在");
+        return setMessage(uiText("待粘贴的资料已不存在"));
       }
       if (
         sources.some(
@@ -2170,7 +2175,7 @@ export function LibraryPage() {
               )),
         )
       ) {
-        return setMessage("不能将文件夹粘贴到自身或其子目录中");
+        return setMessage(uiText("不能将文件夹粘贴到自身或其子目录中"));
       }
       setBusy(true);
       setMessage("");
@@ -2189,10 +2194,10 @@ export function LibraryPage() {
         }
         await refresh();
         setMessage(
-          `已${libraryClipboard.mode === "cut" ? "移动" : "复制"} ${sources.length} 项到目标目录`,
+          uiText`已${libraryClipboard.mode === "cut" ? uiText("移动") : uiText("复制")} ${sources.length} 项到目标目录`,
         );
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "资料粘贴失败");
+        setMessage(error instanceof Error ? error.message : uiText("资料粘贴失败"));
       } finally {
         setBusy(false);
       }
@@ -2223,7 +2228,7 @@ export function LibraryPage() {
         });
         await refresh();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "资料粘贴失败");
+        setMessage(error instanceof Error ? error.message : uiText("资料粘贴失败"));
       } finally {
         setBusy(false);
       }
@@ -2266,8 +2271,8 @@ export function LibraryPage() {
       setThumbnailFailures((current) => new Set(current).add(item.id));
       setMessage(
         error instanceof Error
-          ? `缩略图保存失败：${error.message}`
-          : "缩略图保存失败，可重新打开资料预览后重试",
+          ? uiText`缩略图保存失败：${error.message}`
+          : uiText("缩略图保存失败，可重新打开资料预览后重试"),
       );
       return false;
     }
@@ -2306,8 +2311,8 @@ export function LibraryPage() {
       setThumbnailFailures((current) => new Set(current).add(item.id));
       setMessage(
         error instanceof Error
-          ? `空白缩略图修复失败：${error.message}`
-          : "空白缩略图修复失败",
+          ? uiText`空白缩略图修复失败：${error.message}`
+          : uiText("空白缩略图修复失败"),
       );
     } finally {
       capturedThumbnailRef.current.delete(item.id);
@@ -2333,7 +2338,7 @@ export function LibraryPage() {
     }
     if (!path) {
       setMessage(
-        "请在 MOKI 客户端中选择本地文件；浏览器无法读取文件的绝对路径。",
+        uiText("请在 MOKI 客户端中选择本地文件；浏览器无法读取文件的绝对路径。"),
       );
       return;
     }
@@ -2349,7 +2354,7 @@ export function LibraryPage() {
   async function handlePickFolder() {
     if (!window.mokiDesktop?.selectLocalFolder) {
       setMessage(
-        "请在 MOKI 客户端中选择本地文件夹；浏览器无法读取文件夹的绝对路径。",
+        uiText("请在 MOKI 客户端中选择本地文件夹；浏览器无法读取文件夹的绝对路径。"),
       );
       return;
     }
@@ -2365,7 +2370,7 @@ export function LibraryPage() {
       }
       setMessage("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "本地文件夹选择失败");
+      setMessage(error instanceof Error ? error.message : uiText("本地文件夹选择失败"));
     }
   }
   function parsedTags() {
@@ -2386,7 +2391,7 @@ export function LibraryPage() {
     window.localStorage.setItem(LIBRARY_HIDDEN_TAG_HISTORY_KEY, JSON.stringify(hidden));
   }
   async function saveDialog() {
-    if (!name.trim()) return setMessage("请输入显示名称");
+    if (!name.trim()) return setMessage(uiText("请输入显示名称"));
     const nextTags = parsedTags();
     setBusy(true);
     setMessage("");
@@ -2430,7 +2435,7 @@ export function LibraryPage() {
       await refresh();
       resetDialog();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "资料保存失败");
+      setMessage(error instanceof Error ? error.message : uiText("资料保存失败"));
     } finally {
       setBusy(false);
     }
@@ -2449,7 +2454,7 @@ export function LibraryPage() {
       await updateResourceLibraryItem(item.id, { name: nextName });
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "资料重命名失败");
+      setMessage(error instanceof Error ? error.message : uiText("资料重命名失败"));
     } finally {
       setBusy(false);
       setRenameDraft("");
@@ -2466,7 +2471,7 @@ export function LibraryPage() {
 
   async function remove(item: ResourceLibraryItem) {
     if (
-      !window.confirm(`仅从资料库移除“${item.name}”？不会删除磁盘或在线文件。`)
+      !window.confirm(uiText`仅从资料库移除“${item.name}”？不会删除磁盘或在线文件。`)
     )
       return;
     setBusy(true);
@@ -2474,7 +2479,7 @@ export function LibraryPage() {
       await deleteResourceLibraryItem(item.id);
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "资料删除失败");
+      setMessage(error instanceof Error ? error.message : uiText("资料删除失败"));
     } finally {
       setBusy(false);
     }
@@ -2488,7 +2493,7 @@ export function LibraryPage() {
     }
     if (
       !window.confirm(
-        `仅从资料库移除选中的 ${targets.length} 项？不会删除磁盘或在线文件。`,
+        uiText`仅从资料库移除选中的 ${targets.length} 项？不会删除磁盘或在线文件。`,
       )
     )
       return;
@@ -2498,7 +2503,7 @@ export function LibraryPage() {
       setSelectedItemIds(new Set());
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "资料批量删除失败");
+      setMessage(error instanceof Error ? error.message : uiText("资料批量删除失败"));
     } finally {
       setBusy(false);
     }
@@ -2509,7 +2514,7 @@ export function LibraryPage() {
     if (busy || !targets.length || targets.some(target => !target.target || !["local_file", "local_folder"].includes(target.kind))) return;
     const containsFolder = targets.some(target => target.kind === "local_folder");
     const paths = targets.map(target => `${target.name}\n${target.target}`).join("\n\n");
-    if (!window.confirm(`彻底删除以下 ${targets.length} 项资料？\n\n${paths}\n\n将同时删除资料库记录和本地源文件${containsFolder ? "，包括所选本地文件夹中的全部文件和子文件夹" : ""}。不经过回收站，无法撤销。`)) return;
+    if (!window.confirm(uiText`彻底删除以下 ${targets.length} 项资料？\n\n${paths}\n\n将同时删除资料库记录和本地源文件${containsFolder ? uiText("，包括所选本地文件夹中的全部文件和子文件夹") : ""}。不经过回收站，无法撤销。`)) return;
     setBusy(true);
     let deleted = 0;
     try {
@@ -2518,14 +2523,14 @@ export function LibraryPage() {
         deleted++;
       }
       setSelectedItemIds(new Set());
-      setMessage(`已彻底删除 ${deleted} 项资料及其本地源文件`);
+      setMessage(uiText`已彻底删除 ${deleted} 项资料及其本地源文件`);
     } catch (error) {
-      setMessage(`${deleted ? `已删除 ${deleted} 项；` : ""}${error instanceof Error ? error.message : "彻底删除失败"}`);
+      setMessage(`${deleted ? uiText`已删除 ${deleted} 项；` : ""}${error instanceof Error ? error.message : uiText("彻底删除失败")}`);
     } finally {
       try {
         await refresh();
       } catch {
-        setMessage(previous => `${previous ? `${previous}；` : ""}资料列表刷新失败，请刷新页面查看最新状态`);
+        setMessage(previous => uiText`${previous ? `${previous}；` : ""}资料列表刷新失败，请刷新页面查看最新状态`);
       } finally {
         setBusy(false);
       }
@@ -2545,7 +2550,7 @@ export function LibraryPage() {
     const textResources = clipboardTextResources(dataTransfer.getData("text/uri-list") || dataTransfer.getData("text/plain"));
     const destination = items.find(item => item.id === destinationParentId);
     const localFolder = destination?.kind === "local_folder";
-    const directoryName = destination?.name || "资料库";
+    const directoryName = destination?.name || uiText("资料库");
     let mapped = 0, copied = 0;
     const failures: string[] = [];
     const seen = new Set<string>();
@@ -2572,25 +2577,25 @@ export function LibraryPage() {
             const kind = directories[index] ? "local_folder" : "local_file";
             await addResource({kind, name:displayNameFromTarget(path, kind) || file.name, target:path});
           } else if (directories[index]) {
-            failures.push(file.name + "：请用「添加文件」选择此文件夹");
+            failures.push(file.name + uiText("：请用「添加文件」选择此文件夹"));
           } else {
             await importDroppedFile(file, destinationParentId);
             copied++;
           }
-        } catch (error) { failures.push(file.name + "：" + (error instanceof Error ? error.message : "导入失败")); }
+        } catch (error) { failures.push(file.name + "：" + (error instanceof Error ? error.message : uiText("导入失败"))); }
       }
       for (const resource of textResources) {
         // Explorer can advertise the same local object as a File and as a URL.
         if (files.length && resource.kind !== "url") continue;
         try { await addResource(resource); }
-        catch (error) { failures.push((resource.name || resource.target) + "：" + (error instanceof Error ? error.message : "导入失败")); }
+        catch (error) { failures.push((resource.name || resource.target) + "：" + (error instanceof Error ? error.message : uiText("导入失败"))); }
       }
       if (mapped || copied) await refresh();
-      const done = [mapped && `映射 ${mapped} 项`, copied && `复制 ${copied} 项`].filter(Boolean).join("、");
-      const summary = done ? `已向“${directoryName}”${done}` : "";
-      setMessage([summary, ...failures].filter(Boolean).join("。") || "未读取到可映射的本地文件或链接");
+      const done = [mapped && uiText`映射 ${mapped} 项`, copied && uiText`复制 ${copied} 项`].filter(Boolean).join("、");
+      const summary = done ? uiText`已向“${directoryName}”${done}` : "";
+      setMessage([summary, ...failures].filter(Boolean).join("。") || uiText("未读取到可映射的本地文件或链接"));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "资料导入失败");
+      setMessage(error instanceof Error ? error.message : uiText("资料导入失败"));
     } finally {
       dropPending.current = false;
       setBusy(false);
@@ -2715,7 +2720,7 @@ export function LibraryPage() {
           (target.id === parentId || resourceFolderDescendantIds(items, target.id).has(parentId ?? "")),
       )
     ) {
-      setMessage("不能将文件夹移动到自身或其子目录中");
+      setMessage(uiText("不能将文件夹移动到自身或其子目录中"));
       return;
     }
     setBusy(true);
@@ -2734,11 +2739,11 @@ export function LibraryPage() {
       await refresh();
       const destination = parentId
         ? items.find((item) => item.id === parentId)?.name
-        : "资料库";
-      setMessage(copied ? `已向“${destination ?? "资料库"}”复制 ${copied} 项本地资料` : `已将 ${targets.length} 项移动到“${destination ?? "资料库"}”`);
+        : uiText("资料库");
+      setMessage(copied ? uiText`已向“${destination ?? uiText("资料库")}”复制 ${copied} 项本地资料` : uiText`已将 ${targets.length} 项移动到“${destination ?? uiText("资料库")}”`);
       setSelectedItemIds(new Set());
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "资料移动失败");
+      setMessage(error instanceof Error ? error.message : uiText("资料移动失败"));
     } finally {
       setBusy(false);
       setDraggedItemId("");
@@ -2795,7 +2800,7 @@ export function LibraryPage() {
       const result = await requestParent<{destination?:string}>("open-preview", {id:item.id, name:item.name, destination}, 45000);
       if (result?.destination === "system") await openResourceLibraryItem(item.id);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "预览打开失败");
+      setMessage(error instanceof Error ? error.message : uiText("预览打开失败"));
     }
   }
 
@@ -2869,13 +2874,10 @@ export function LibraryPage() {
           }}
           className={itemMenuButtonClass}
         >
-          <ExternalLink size={14} />
-          打开
-        </button>
+          <ExternalLink size={14} />{uiText("打开")}</button>
         {!isFolder(item) && <button type="button" role="menuitem" disabled={targetCount > 1} className={itemMenuButtonClass + " library-open-in-sidebar"}
           onClick={() => {setCardMenuId(""); setContextMenu(undefined); void showPreview(item, "sidebar");}}>
-          <PanelRightOpen size={14}/>在侧边工作区打开
-        </button>}
+          <PanelRightOpen size={14}/>{uiText("在侧边工作区打开")}</button>}
         {(item.kind === "local_folder" || item.kind === "local_file") ? (
           <button
             type="button"
@@ -2884,9 +2886,7 @@ export function LibraryPage() {
             onClick={() => void openInExplorer(item)}
             className={itemMenuButtonClass}
           >
-            <FolderOpen size={14} />
-            打开路径
-          </button>
+            <FolderOpen size={14} />{uiText("打开路径")}</button>
         ) : null}
         <button
           type="button"
@@ -2895,16 +2895,12 @@ export function LibraryPage() {
           onClick={() => void copyItemPath(item)}
           className={itemMenuButtonClass}
         >
-          <Copy size={14} />
-          复制路径
-        </button>
-        {item.kind === "local_folder" ? <button type="button" role="menuitem" disabled={targetCount > 1 || busy} className={itemMenuButtonClass} onClick={() => beginEdit(item)}><ShieldCheck size={14} />助手权限</button> : null}
+          <Copy size={14} />{uiText("复制路径")}</button>
+        {item.kind === "local_folder" ? <button type="button" role="menuitem" disabled={targetCount > 1 || busy} className={itemMenuButtonClass} onClick={() => beginEdit(item)}><ShieldCheck size={14} />{uiText("助手权限")}</button> : null}
         <div role="separator" className="moki-menu-divider" />
         {item.kind === "local_file" ? (
           <button type="button" role="menuitem" disabled={operationItems(item).some(target => target.kind !== "local_file")} onClick={() => void copyActualFile(item)} className={itemMenuButtonClass}>
-            <Copy size={14} />
-            复制文件
-          </button>
+            <Copy size={14} />{uiText("复制文件")}</button>
         ) : null}
         <button
           type="button"
@@ -2913,9 +2909,7 @@ export function LibraryPage() {
           onClick={() => void saveItemAs(item)}
           className={itemMenuButtonClass}
         >
-          <Download size={14} />
-          另存为
-        </button>
+          <Download size={14} />{uiText("另存为")}</button>
         <div role="separator" className="moki-menu-divider" />
         <button
           type="button"
@@ -2924,9 +2918,7 @@ export function LibraryPage() {
           onClick={() => beginEdit(item)}
           className={itemMenuButtonClass}
         >
-          <Pencil size={14} />
-          编辑
-        </button>
+          <Pencil size={14} />{uiText("编辑")}</button>
         <button
           type="button"
           role="menuitem"
@@ -2935,9 +2927,7 @@ export function LibraryPage() {
           onClick={() => startInlineRename(item)}
           className={itemMenuButtonClass}
         >
-          <TextCursorInput size={14} />
-          重命名
-        </button>
+          <TextCursorInput size={14} />{uiText("重命名")}</button>
         {isFolder(item) ? (
           <button
             ref={folderColorTriggerRef}
@@ -2958,9 +2948,7 @@ export function LibraryPage() {
             }}
             className={itemMenuButtonClass}
           >
-            <Palette size={14} />
-            文件夹颜色
-            <ChevronRight size={13} className="ml-auto" />
+            <Palette size={14} />{uiText("文件夹颜色")}<ChevronRight size={13} className="ml-auto" />
           </button>
         ) : null}
         {item.kind === "local_folder" ? (
@@ -2971,9 +2959,7 @@ export function LibraryPage() {
             onClick={() => startFolderReindex(item)}
             className={itemMenuButtonClass}
           >
-            <FolderInput size={14} />
-            重新索引
-          </button>
+            <FolderInput size={14} />{uiText("重新索引")}</button>
         ) : null}
         <div role="separator" className="moki-menu-divider" />
         <button
@@ -2982,17 +2968,14 @@ export function LibraryPage() {
           onClick={() => beginMove(item)}
           className={itemMenuButtonClass}
         >
-          <FolderTree size={14} />
-          移动到
-        </button>
+          <FolderTree size={14} />{uiText("移动到")}</button>
         <button
           type="button"
           role="menuitem"
           onClick={() => copyOrCutItems(item, "copy")}
           className={itemMenuButtonClass}
         >
-          <ClipboardCopy size={14} />
-          复制{targetCount > 1 ? ` (${targetCount})` : ""}
+          <ClipboardCopy size={14} />{uiText("复制")}{targetCount > 1 ? ` (${targetCount})` : ""}
         </button>
         <button
           type="button"
@@ -3000,8 +2983,7 @@ export function LibraryPage() {
           onClick={() => copyOrCutItems(item, "cut")}
           className={itemMenuButtonClass}
         >
-          <Scissors size={14} />
-          剪切{targetCount > 1 ? ` (${targetCount})` : ""}
+          <Scissors size={14} />{uiText("剪切")}{targetCount > 1 ? ` (${targetCount})` : ""}
         </button>
         <button
           type="button"
@@ -3010,9 +2992,7 @@ export function LibraryPage() {
           onClick={() => void pasteIntoFolder(pasteDestination ?? null)}
           className={itemMenuButtonClass}
         >
-          <ClipboardPaste size={14} />
-          粘贴
-        </button>
+          <ClipboardPaste size={14} />{uiText("粘贴")}</button>
         <div role="separator" className="moki-menu-divider" />
         <button
           type="button"
@@ -3026,14 +3006,13 @@ export function LibraryPage() {
           className={itemMenuButtonClass}
           data-tone="danger"
         >
-          <Trash2 size={14} />
-          移除{targetCount > 1 ? ` (${targetCount})` : ""}
+          <Trash2 size={14} />{uiText("移除")}{targetCount > 1 ? ` (${targetCount})` : ""}
         </button>
         <button
           type="button"
           role="menuitem"
           disabled={busy || operationItems(item).some(target => !target.target || !["local_file", "local_folder"].includes(target.kind))}
-          title="删除本地文件或文件夹及其资料库记录"
+          title={uiText("删除本地文件或文件夹及其资料库记录")}
           onClick={() => {
             setCardMenuId("");
             setContextMenu(undefined);
@@ -3042,8 +3021,7 @@ export function LibraryPage() {
           className={itemMenuButtonClass}
           data-tone="danger"
         >
-          <Trash2 size={14} />
-          彻底删除{targetCount > 1 ? ` (${targetCount})` : ""}
+          <Trash2 size={14} />{uiText("彻底删除")}{targetCount > 1 ? ` (${targetCount})` : ""}
         </button>
       </>
     );
@@ -3097,7 +3075,7 @@ export function LibraryPage() {
       >
         <button
           type="button"
-          aria-label={`按${label}排序${direction ? `，当前${direction === "asc" ? "升序" : "降序"}` : ""}`}
+          aria-label={uiText`按${label}排序${direction ? uiText`，当前${direction === "asc" ? uiText("升序") : uiText("降序")}` : ""}`}
           onClick={() =>
             setSortMode((current) => toggleLibrarySortMode(current, field))
           }
@@ -3115,7 +3093,10 @@ export function LibraryPage() {
     );
   };
   return (
-    <AppShell hideMainScrollbar fitMainContent>
+    <AppShell hideMainScrollbar fitMainContent
+      onPointerDown={beginBoxSelection} onPointerMove={updateBoxSelection}
+      onPointerUp={event => updateBoxSelection(event, true)}
+      onPointerCancel={cancelBoxSelection} onLostPointerCapture={cancelBoxSelection}>
       <div
         id="resource-library-page"
         ref={pageRef}
@@ -3141,9 +3122,7 @@ export function LibraryPage() {
               onDragLeave={() => setBreadcrumbDropId(undefined)}
               onDrop={(event) => dropOnBreadcrumb(event, null)}
               className={`flex h-8 min-h-0 shrink-0 items-center rounded-lg px-2 py-0 transition ${breadcrumbDropId === "root" ? "bg-[#dedcf9] text-[#5f58bd] ring-1 ring-[#716acd]" : "hover:bg-[#f1f0ff]"}`}
-            >
-              资料库
-            </button>
+            >{uiText("资料库")}</button>
             {breadcrumbs.map((item) => (
               <span
                 key={item.id}
@@ -3168,7 +3147,7 @@ export function LibraryPage() {
             <div ref={createMenuRef} className="relative shrink-0">
               <Button
                 type="button"
-                aria-label="新建" title="新建"
+                aria-label={uiText("新建")} title={uiText("新建")}
                 aria-controls="library-create-menu"
                 aria-expanded={createMenuOpen}
                 aria-haspopup="menu"
@@ -3186,7 +3165,7 @@ export function LibraryPage() {
                 size="compact"
               >
                 <Plus size={15} />
-                <span className="library-action-label">新建</span>
+                <span className="library-action-label">{uiText("新建")}</span>
                 <ChevronDown
                   size={14}
                   className={`transition-transform ${createMenuOpen ? "rotate-180" : ""}`}
@@ -3198,7 +3177,7 @@ export function LibraryPage() {
                   ref={createMenuSurfaceRef}
                   onKeyDown={navigateMenu}
                   role="menu"
-                  aria-label="新建内容"
+                  aria-label={uiText("新建内容")}
                   className="moki-menu-surface library-menu fixed z-[100] w-60 max-h-[60vh] overflow-y-auto p-1.5"
                 >
                   {createMenuItems()}
@@ -3212,10 +3191,10 @@ export function LibraryPage() {
                 setParentIdDraft(folderId ?? "");
                 setCreateMode("mapping");
               }}
-              variant="primary" size="compact" aria-label="添加文件" title="添加文件"
+              variant="primary" size="compact" aria-label={uiText("添加文件")} title={uiText("添加文件")}
             >
               <FileUp size={15} />
-              <span className="library-action-label">添加文件</span>
+              <span className="library-action-label">{uiText("添加文件")}</span>
             </Button>
           </div>
         </header>
@@ -3228,7 +3207,7 @@ export function LibraryPage() {
             />
             <Input
               ref={searchInputRef}
-              aria-label="搜索资料库"
+              aria-label={uiText("搜索资料库")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={event => {
@@ -3237,46 +3216,46 @@ export function LibraryPage() {
                 event.stopPropagation();
                 clearSearch();
               }}
-              placeholder="搜索名称、标签或路径"
+              placeholder={uiText("搜索名称、标签或路径")}
               className="moki-ui-toolbar-search w-full"
             />
-            {query && <button type="button" aria-label="清除搜索" title="清除搜索" className="library-search-clear" onClick={clearSearch}>
+            {query && <button type="button" aria-label={uiText("清除搜索")} title={uiText("清除搜索")} className="library-search-clear" onClick={clearSearch}>
               <X size={14} aria-hidden="true" />
             </button>}
           </div>
           <div className="dsh-library-view-actions">
-          <div className="library-sort-control" title="资料排序">
+          <div className="library-sort-control" title={uiText("资料排序")}>
           <ArrowDownUp size={14} aria-hidden="true"/>
           <select
             id="library-sort"
-            aria-label="资料排序"
+            aria-label={uiText("资料排序")}
             value={sortMode}
             onChange={(event) =>
               setSortMode(event.target.value as LibrarySortMode)
             }
             className="library-toolbar-field h-10 shrink-0 rounded-xl border border-[#e1e3ec] bg-white px-3 text-[0.6875rem] font-bold text-[#656b7e] outline-none focus:border-[#8a83d9]"
           >
-            <option value="manual">自定义排序</option>
-            <option value="name-asc">名称：升序 A–Z</option>
-            <option value="name-desc">名称：降序 Z–A</option>
-            <option value="type-asc">类型：升序</option>
-            <option value="type-desc">类型：降序</option>
-            <option value="path-asc">路径：升序</option>
-            <option value="path-desc">路径：降序</option>
-            <option value="modified-desc">文件修改：由新到旧</option>
-            <option value="modified-asc">文件修改：由旧到新</option>
-            <option value="added-desc">添加时间：由新到旧</option>
-            <option value="added-asc">添加时间：由旧到新</option>
+            <option value="manual">{uiText("自定义排序")}</option>
+            <option value="name-asc">{uiText("名称：升序 A–Z")}</option>
+            <option value="name-desc">{uiText("名称：降序 Z–A")}</option>
+            <option value="type-asc">{uiText("类型：升序")}</option>
+            <option value="type-desc">{uiText("类型：降序")}</option>
+            <option value="path-asc">{uiText("路径：升序")}</option>
+            <option value="path-desc">{uiText("路径：降序")}</option>
+            <option value="modified-desc">{uiText("文件修改：由新到旧")}</option>
+            <option value="modified-asc">{uiText("文件修改：由旧到新")}</option>
+            <option value="added-desc">{uiText("添加时间：由新到旧")}</option>
+            <option value="added-asc">{uiText("添加时间：由旧到新")}</option>
           </select>
           </div>
           <div
             className="library-toolbar-field flex h-10 shrink-0 items-center rounded-xl border border-[#e1e3ec] bg-white p-1"
             role="group"
-            aria-label="资料显示模式"
+            aria-label={uiText("资料显示模式")}
           >
             <button
               type="button"
-              aria-label="卡片模式"
+              aria-label={uiText("卡片模式")}
               aria-pressed={viewMode === "grid"}
               onClick={() => setViewMode("grid")}
               className={`library-view-mode-button grid size-8 aspect-square min-h-0 shrink-0 place-items-center rounded-lg transition ${viewMode === "grid" ? "bg-[#292f47] text-white" : "text-[#858b9d] hover:bg-[#f1f0ff]"}`}
@@ -3285,7 +3264,7 @@ export function LibraryPage() {
             </button>
             <button
               type="button"
-              aria-label="列表模式"
+              aria-label={uiText("列表模式")}
               aria-pressed={viewMode === "list"}
               onClick={() => setViewMode("list")}
               className={`library-view-mode-button grid size-8 aspect-square min-h-0 shrink-0 place-items-center rounded-lg transition ${viewMode === "list" ? "bg-[#292f47] text-white" : "text-[#858b9d] hover:bg-[#f1f0ff]"}`}
@@ -3295,8 +3274,8 @@ export function LibraryPage() {
             {viewMode === "list" && columnWidths.hasCustomWidths ? (
               <IconButton
                 variant="ghost"
-                aria-label="恢复默认列宽"
-                title="恢复默认列宽"
+                aria-label={uiText("恢复默认列宽")}
+                title={uiText("恢复默认列宽")}
                 onClick={columnWidths.resetAll}
               >
                 <RotateCcw size={14} />
@@ -3315,9 +3294,7 @@ export function LibraryPage() {
                 onClick={() => setTagFilter("")}
                 aria-pressed={!tagFilter}
                 className={`library-filter-tag h-5 min-h-0 shrink-0 rounded-full px-2.5 py-0 text-[0.625rem] font-bold leading-5 ${!tagFilter ? "bg-[#292f47] text-white" : "bg-white text-[#6e7487]"}`}
-              >
-                全部标签
-              </button>
+              >{uiText("全部标签")}</button>
               {availableTags.map((tag) => (
                 <button
                   key={tag}
@@ -3339,54 +3316,44 @@ export function LibraryPage() {
           <div
             className="dsh-selection-toolbar"
             role="toolbar"
-            aria-label="资料多选操作"
+            aria-label={uiText("资料多选操作")}
           >
-            <span className="mr-auto">已选择 {selectedItemIds.size} 项</span>
+            <span className="mr-auto">{uiText("已选择")}{selectedItemIds.size}{uiText("项")}</span>
             <button
               type="button"
               onClick={() =>
                 setSelectedItemIds(new Set(visible.map((item) => item.id)))
               }
               className="rounded-lg px-2.5 py-1.5"
-            >
-              全选当前结果
-            </button>
+            >{uiText("全选当前结果")}</button>
             <button
               type="button"
               onClick={() => copyOrCutItems(undefined, "copy")}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
             >
-              <ClipboardCopy size={13} />
-              复制
-            </button>
+              <ClipboardCopy size={13} />{uiText("复制")}</button>
             <button
               type="button"
               onClick={() => copyOrCutItems(undefined, "cut")}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
             >
-              <Scissors size={13} />
-              剪切
-            </button>
+              <Scissors size={13} />{uiText("剪切")}</button>
             <button
               type="button"
               onClick={() => beginMove()}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
             >
-              <FolderTree size={13} />
-              移动到
-            </button>
+              <FolderTree size={13} />{uiText("移动到")}</button>
             <button
               type="button"
               disabled={busy}
               onClick={() => void removeOperationItems()}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 dsh-remove disabled:opacity-40"
             >
-              <Trash2 size={13} />
-              移除
-            </button>
+              <Trash2 size={13} />{uiText("移除")}</button>
             <button
               type="button"
-              aria-label="清除选择"
+              aria-label={uiText("清除选择")}
               onClick={() => setSelectedItemIds(new Set())}
               className="grid size-7 place-items-center rounded-lg"
             >
@@ -3402,7 +3369,7 @@ export function LibraryPage() {
             <span className="min-w-0 flex-1">{message}</span>
             <button
               type="button"
-              aria-label="忽略提醒"
+              aria-label={uiText("忽略提醒")}
               onClick={() => setMessage("")}
               className="library-dismiss"
             >
@@ -3468,23 +3435,19 @@ export function LibraryPage() {
           className="moki-ui-card flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden"
         >
           {dragActive && <div className="library-drop-hint" role="status">
-            {dropFolder?.kind === "local_folder" ? `松开以复制到“${dropFolder.name}”` : `松开以添加到“${dropFolder?.name || "资料库"}”`}
+            {dropFolder?.kind === "local_folder" ? uiText`松开以复制到“${dropFolder.name}”` : uiText`松开以添加到“${dropFolder?.name || uiText("资料库")}”`}
           </div>}
           <div
             ref={selectionSurfaceRef}
             data-library-view={viewMode}
-            onPointerDown={beginBoxSelection}
-            onPointerMove={updateBoxSelection}
-            onPointerUp={event => updateBoxSelection(event, true)}
-            onPointerCancel={cancelBoxSelection}
-            onLostPointerCapture={cancelBoxSelection}
             data-page-scroll-key={`library:${folderId??"root"}`} aria-busy={initialLoading} className="library-resource-scroll relative min-h-0 min-w-0 max-w-full flex-1 touch-pan-y overflow-x-hidden overflow-y-auto p-4"
           >
             {selectionRect && (selectionRect.startX !== selectionRect.currentX || selectionRect.startY !== selectionRect.currentY) ? (
-              <div
+              createPortal(<div
                 aria-hidden="true"
                 className="library-selection-rect"
                 style={{
+                  position: 'fixed',
                   left: Math.min(selectionRect.startX, selectionRect.currentX),
                   top: Math.min(selectionRect.startY, selectionRect.currentY),
                   width: Math.abs(
@@ -3494,7 +3457,7 @@ export function LibraryPage() {
                     selectionRect.currentY - selectionRect.startY,
                   ),
                 }}
-              />
+              />, document.body)
             ) : null}
             {currentFolderLoading ? (
               <div
@@ -3503,16 +3466,14 @@ export function LibraryPage() {
               >
                 <div className="flex items-center justify-between gap-3 text-[0.6875rem] font-bold text-[#625bc5]">
                   <span className="flex items-center gap-2">
-                    <LoaderCircle size={14} className="motion-safe:animate-spin" aria-hidden="true" />
-                    正在读取“{current?.name}”中的文件
-                  </span>
+                    <LoaderCircle size={14} className="motion-safe:animate-spin" aria-hidden="true" />{uiText("正在读取“")}{current?.name}{uiText("”中的文件")}</span>
                   <span>
                     {currentIndexStatus?.total
                       ? `${currentIndexProgress}%`
-                      : "正在扫描"}
+                      : uiText("正在扫描")}
                   </span>
                 </div>
-                <div className="moki-loading-progress" role="progressbar" aria-label="文件夹读取进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={currentIndexStatus?.total ? currentIndexProgress : undefined} data-indeterminate={!currentIndexStatus?.total}>
+                <div className="moki-loading-progress" role="progressbar" aria-label={uiText("文件夹读取进度")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={currentIndexStatus?.total ? currentIndexProgress : undefined} data-indeterminate={!currentIndexStatus?.total}>
                   <div
                     style={{
                       width: currentIndexStatus?.total ? `${currentIndexProgress}%` : undefined,
@@ -3522,7 +3483,7 @@ export function LibraryPage() {
               </div>
             ) : null}
             {initialLoading ? (
-              <PageFeedback title="正在加载资料库" description="读取文件、文件夹与映射目录。" skeleton="rows" />
+              <PageFeedback title={uiText("正在加载资料库")} description={uiText("读取文件、文件夹与映射目录。")} skeleton="rows" />
             ) : visible.length ? (
               <div
                 className={viewMode === "list" ? "library-list-table" : "contents"}
@@ -3533,22 +3494,22 @@ export function LibraryPage() {
                   <div
                     role="row"
                     className="library-list-header"
-                    aria-label="资料列表列标题"
+                    aria-label={uiText("资料列表列标题")}
                   >
                     <span aria-hidden="true" />
                     {sortHeader(
                       "name",
-                      "名称",
+                      uiText("名称"),
                       "library-list-name-column",
                     )}
-                    {sortHeader("type", "类型", "library-list-type-column")}
+                    {sortHeader("type", uiText("类型"), "library-list-type-column")}
                     {sortHeader(
                       "path",
-                      "路径",
+                      uiText("路径"),
                       "library-list-path-column",
                     )}
-                    {sortHeader("modified", "修改时间", "library-list-modified-column")}
-                    {sortHeader("added", "添加时间", "library-list-added-column")}
+                    {sortHeader("modified", uiText("修改时间"), "library-list-modified-column")}
+                    {sortHeader("added", uiText("添加时间"), "library-list-added-column")}
                   </div>
                 ) : null}
                 <LibraryResultWindow items={visible} viewMode={viewMode} scrollRef={selectionSurfaceRef}
@@ -3646,8 +3607,8 @@ export function LibraryPage() {
                           <span
                             aria-label={
                               dropMode === "before"
-                                ? `插入到 ${item.name} 前`
-                                : `插入到 ${item.name} 后`
+                                ? uiText`插入到 ${item.name} 前`
+                                : uiText`插入到 ${item.name} 后`
                             }
                             data-card-insertion-indicator
                             className="library-insertion-mark"
@@ -3664,13 +3625,13 @@ export function LibraryPage() {
                           }}
                           title={
                             selected
-                              ? "取消选择"
-                              : "选择资料"
+                              ? uiText("取消选择")
+                              : uiText("选择资料")
                           }
                         >
                           <input
                             type="checkbox"
-                            aria-label={`选择 ${item.name}`}
+                            aria-label={uiText`选择 ${item.name}`}
                             checked={selected}
                             readOnly
                             onKeyDown={(event) => {
@@ -3718,7 +3679,7 @@ export function LibraryPage() {
                             className={`h-full min-w-0 w-full max-w-full cursor-pointer overflow-hidden text-left outline-none ${viewMode === "grid" ? "library-grid-entry" : "library-list-row-content"}`}
                         >
                           <ResourceFileIcon item={item} previewItem={item} size={viewMode === "grid" ? 40 : 32}
-                            title={item.kind === "local_file" ? (nativeFileDrag ? "拖到文件夹、DSH 对话或其他应用" : "拖动到文件夹或 DSH 对话；按住 Alt 拖到其他应用") : undefined}
+                            title={item.kind === "local_file" ? (nativeFileDrag ? uiText("拖到文件夹、DSH 对话或其他应用") : uiText("拖动到文件夹或 DSH 对话；按住 Alt 拖到其他应用")) : undefined}
                             className={`${viewMode === "list" ? "library-list-icon" : ""} ${iconStyle ? "library-folder-icon-colored" : ""}`}
                             style={iconStyle}
                           >
@@ -3747,7 +3708,7 @@ export function LibraryPage() {
                             {renamingItemId === item.id ? (
                               <input
                                 ref={renameElementRef}
-                                aria-label={`重命名 ${item.name}`}
+                                aria-label={uiText`重命名 ${item.name}`}
                                 value={renameDraft}
                                 draggable={false}
                                 onPointerDownCapture={(event) =>
@@ -3795,13 +3756,13 @@ export function LibraryPage() {
                               indexStatus.status === "indexing") ? (
                               <span
                                 className="mt-2 w-full"
-                                aria-label={`文件夹索引进度 ${item.name}`}
+                                aria-label={uiText`文件夹索引进度 ${item.name}`}
                               >
                                 <span className="flex items-center justify-between text-[0.5625rem] font-bold text-[#7068c5]">
                                   <span>
                                     {indexStatus.phase === "scanning"
-                                      ? "扫描中"
-                                      : "映射中"}
+                                      ? uiText("扫描中")
+                                      : uiText("映射中")}
                                   </span>
                                   <span>
                                     {indexStatus.total
@@ -3823,9 +3784,7 @@ export function LibraryPage() {
                               <span
                                 className="mt-2 block w-full truncate text-[0.5625rem] font-bold text-[#bd5570]"
                                 title={indexStatus.error}
-                              >
-                                索引失败，可重试
-                              </span>
+                              >{uiText("索引失败，可重试")}</span>
                             ) : null}
                             {item.tags.length ? (
                               <span className="mt-1 flex max-h-5 max-w-full shrink-0 items-center gap-1 overflow-hidden pb-0.5">
@@ -3855,20 +3814,18 @@ export function LibraryPage() {
                             <span
                               data-resource-path
                               className="library-list-path-column min-w-0 max-w-full truncate whitespace-nowrap"
-                              title={item.target || "无本地或在线路径"}
+                              title={item.target || uiText("无本地或在线路径")}
                             >
                               {item.target || "—"}
                             </span>
                           ) : null}
                           {viewMode === "grid" ? <span className="library-grid-dates">
-                            <span className="truncate">
-                              修改{" "}
+                            <span className="truncate">{uiText("修改")}{" "}
                               {formatResourceTime(
                                 item.fileModifiedAt ?? item.fileCreatedAt,
                               )}
                             </span>
-                            <span className="truncate">
-                              添加 {formatResourceTime(item.createdAt)}
+                            <span className="truncate">{uiText("添加")}{" "}{formatResourceTime(item.createdAt)}
                             </span>
                           </span> : <>
                             <time data-resource-modified className="library-list-modified-column truncate" dateTime={item.fileModifiedAt ?? item.fileCreatedAt ?? undefined} title={formatResourceTime(item.fileModifiedAt ?? item.fileCreatedAt)}>
@@ -3884,8 +3841,8 @@ export function LibraryPage() {
                         >
                           {item.kind === "local_file" && !busy && renamingItemId !== item.id ? (
                             <button type="button" draggable className="library-file-export"
-                              aria-label={`拖出文件 ${item.name}`}
-                              title={selectedItemIds.has(item.id) && selectedItemIds.size > 1 ? (nativeFileDrag ? "拖出或点击复制所选原文件" : "将所选文件打包拖出为 ZIP，点击复制所选原文件") : "拖到资源管理器或其他应用，点击复制此文件"}
+                              aria-label={uiText`拖出文件 ${item.name}`}
+                              title={selectedItemIds.has(item.id) && selectedItemIds.size > 1 ? (nativeFileDrag ? uiText("拖出或点击复制所选原文件") : uiText("将所选文件打包拖出为 ZIP，点击复制所选原文件")) : uiText("拖到资源管理器或其他应用，点击复制此文件")}
                               onPointerEnter={() => prepareFileExport(operationItems(item))}
                               onFocus={() => prepareFileExport(operationItems(item))}
                               onDragStart={event => startFileDrag(event, item)}
@@ -3895,7 +3852,7 @@ export function LibraryPage() {
                           ) : null}
                           <button
                             type="button"
-                            aria-label={`更多操作 ${item.name}`}
+                            aria-label={uiText`更多操作 ${item.name}`}
                             aria-haspopup="menu"
                             aria-expanded={
                               cardMenuId === item.id &&
@@ -3919,12 +3876,12 @@ export function LibraryPage() {
                 <div>
                   {currentFolderSearchEntries.length ? <Search size={26} aria-hidden="true"/> : <FolderInput size={28} aria-hidden="true"/>}
                   <b>
-                    {currentFolderSearchEntries.length ? "没有匹配的资料" : "拖拽内容到此处添加到资料库"}
+                    {currentFolderSearchEntries.length ? uiText("没有匹配的资料") : uiText("拖拽内容到此处添加到资料库")}
                   </b>
                   <p>
                     {currentFolderSearchEntries.length
-                      ? "尝试调整搜索词或标签筛选。"
-                      : "支持文件、文件夹和链接，也可点击「添加文件」。"}
+                      ? uiText("尝试调整搜索词或标签筛选。")
+                      : uiText("支持文件、文件夹和链接，也可点击「添加文件」。")}
                   </p>
                 </div>
               </div>
@@ -3939,8 +3896,8 @@ export function LibraryPage() {
           role="menu"
           aria-label={
             contextMenu.item
-              ? `${contextMenu.item.name} 操作`
-              : "资料库空白区域操作"
+              ? uiText`${contextMenu.item.name} 操作`
+              : uiText("资料库空白区域操作")
           }
           className="moki-menu-surface library-menu fixed z-[100] max-h-[calc(100vh-1rem)] w-60 overflow-y-auto p-1.5"
           style={{ left: contextMenu.x, top: contextMenu.y, visibility: "hidden" }}
@@ -3965,18 +3922,14 @@ export function LibraryPage() {
                 }}
                 className={itemMenuButtonClass}
               >
-                <FileUp size={14} />
-                添加文件
-              </button>
+                <FileUp size={14} />{uiText("添加文件")}</button>
               <button
                 type="button"
                 role="menuitem"
                 onClick={() => void pasteIntoCurrentFolder()}
                 className={itemMenuButtonClass}
               >
-                <ClipboardPaste size={14} />
-                粘贴文件 / 文件夹 / 链接
-              </button>
+                <ClipboardPaste size={14} />{uiText("粘贴文件 / 文件夹 / 链接")}</button>
             </>
           )}
         </div>,
@@ -3987,7 +3940,7 @@ export function LibraryPage() {
           id="library-folder-color-menu"
           ref={folderColorMenuRef}
           role="menu"
-          aria-label={`${contextMenu.item.name} 文件夹颜色`}
+          aria-label={uiText`${contextMenu.item.name} 文件夹颜色`}
           className="moki-menu-surface fixed z-[101] flex w-max items-center gap-2 p-2"
           style={{ left: folderColorMenu.right + 4, top: folderColorMenu.top, visibility: "hidden" }}
           onPointerDown={(event) => event.stopPropagation()}
@@ -4006,7 +3959,7 @@ export function LibraryPage() {
               key={color.id}
               type="button"
               role="menuitemradio"
-              aria-label={`设置${contextMenu.item!.name}为${color.label}`}
+              aria-label={uiText`设置${contextMenu.item!.name}为${color.label}`}
               aria-checked={(contextMenu.item!.folderColor ?? "violet") === color.id}
               title={color.label}
               onClick={() => void setFolderColor(contextMenu.item!, color.id)}
@@ -4025,16 +3978,12 @@ export function LibraryPage() {
                 <h2
                   id="library-move-dialog-title"
                   className="text-[1rem] font-black"
-                >
-                  移动到
-                </h2>
-                <p className="mt-1 text-[0.6875rem] text-[#8b91a3]">
-                  将选中的 {moveDialogItems.length} 项移动到其他资料目录。
-                </p>
+                >{uiText("移动到")}</h2>
+                <p className="mt-1 text-[0.6875rem] text-[#8b91a3]">{uiText("将选中的")}{moveDialogItems.length}{uiText("项移动到其他资料目录。")}</p>
               </div>
               <button
                 type="button"
-                aria-label="关闭移动到"
+                aria-label={uiText("关闭移动到")}
                 onClick={() => setMoveDialogItems([])}
                 className="grid size-8 place-items-center rounded-xl bg-[#f4f5f8]"
               >
@@ -4042,10 +3991,10 @@ export function LibraryPage() {
               </button>
             </header>
             <div className="library-dialog-body">
-              <span>目标目录</span>
+              <span>{uiText("目标目录")}</span>
               <div
                 role="tree"
-                aria-label="移动目标目录树"
+                aria-label={uiText("移动目标目录树")}
                 className="mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-[#dedfea] bg-[#fafafe] p-1.5"
               >
                 <div
@@ -4060,7 +4009,7 @@ export function LibraryPage() {
                     className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
                   >
                     <FolderTree size={14} className="shrink-0" />
-                    <span className="truncate">资料库根目录</span>
+                    <span className="truncate">{uiText("资料库根目录")}</span>
                   </button>
                 </div>
                 {renderMoveFolderNodes(moveFolderTree)}
@@ -4076,16 +4025,14 @@ export function LibraryPage() {
                 type="button"
                 onClick={() => setMoveDialogItems([])}
                 className="rounded-xl bg-[#f4f5f8] px-4 py-2 text-[0.75rem] font-bold"
-              >
-                取消
-              </button>
+              >{uiText("取消")}</button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void confirmMove()}
                 className="rounded-xl bg-[#242a40] px-4 py-2 text-[0.75rem] font-bold text-white disabled:opacity-50"
               >
-                {busy ? "移动中..." : "确认移动"}
+                {busy ? uiText("移动中...") : uiText("确认移动")}
               </button>
             </footer>
           </section>
@@ -4101,22 +4048,22 @@ export function LibraryPage() {
                   className="text-[1rem] font-black"
                 >
                   {editingItem
-                    ? "编辑资料"
+                    ? uiText("编辑资料")
                     : createMode === "folder"
-                      ? "添加虚拟文件夹"
+                      ? uiText("添加虚拟文件夹")
                       : createMode === "file"
-                        ? "新建文件"
-                        : "添加资料映射"}
+                        ? uiText("新建文件")
+                        : uiText("添加资料映射")}
                 </h2>
                 <p className="mt-1 text-[0.6875rem] text-[#8b91a3]">
                   {createMode === "file"
-                    ? "在当前资料目录创建可立即预览、编辑的真实文件。"
-                    : "只保存路径或链接，不上传文件内容。"}
+                    ? uiText("在当前资料目录创建可立即预览、编辑的真实文件。")
+                    : uiText("只保存路径或链接，不上传文件内容。")}
                 </p>
               </div>
               <button
                 type="button"
-                aria-label="关闭"
+                aria-label={uiText("关闭")}
                 onClick={resetDialog}
                 className="grid size-8 place-items-center rounded-xl bg-[#f4f5f8]"
               >
@@ -4125,35 +4072,30 @@ export function LibraryPage() {
             </header>
             <div className="library-dialog-body">
               {!editingItem && createMode === "mapping" ? (
-                <label className="grid gap-1.5 text-[0.6875rem] font-bold">
-                  映射类型
-                  <select
+                <label className="grid gap-1.5 text-[0.6875rem] font-bold">{uiText("映射类型")}<select
                     value={kind}
                     onChange={(event) =>
                       setKind(event.target.value as typeof kind)
                     }
                     className="h-10 rounded-xl border border-[#dedfea] px-3"
                   >
-                    <option value="local_file">本地文件</option>
-                    <option value="local_folder">本地文件夹</option>
-                    <option value="url">在线文件</option>
+                    <option value="local_file">{uiText("本地文件")}</option>
+                    <option value="local_folder">{uiText("本地文件夹")}</option>
+                    <option value="url">{uiText("在线文件")}</option>
                   </select>
                 </label>
               ) : null}
               {(editingItem?.kind === "local_folder" || !editingItem && createMode === "mapping" && kind === "local_folder") ? <div className="moki-ui-card grid gap-2 p-3" data-surface="inner">
-                <label className="grid gap-2 text-sm font-bold">DSH 文件夹权限
-                  <PermissionSelect value={assistantPermission ?? "inherit"} disabled={busy} onChange={event => setAssistantPermission(event.target.value === "inherit" ? null : event.target.value as "read_only" | "write")}>
-                    <option value="inherit">跟随上级（未授权时只读）</option>
-                    <option value="read_only">只读，操作时请求确认</option>
-                    <option value="write">可写入并操作</option>
+                <label className="grid gap-2 text-sm font-bold">{uiText("DSH 文件夹权限")}<PermissionSelect value={assistantPermission ?? "inherit"} disabled={busy} onChange={event => setAssistantPermission(event.target.value === "inherit" ? null : event.target.value as "read_only" | "write")}>
+                    <option value="inherit">{uiText("跟随上级（未授权时只读）")}</option>
+                    <option value="read_only">{uiText("只读，操作时请求确认")}</option>
+                    <option value="write">{uiText("可写入并操作")}</option>
                   </PermissionSelect>
                 </label>
-                <p className="moki-ui-muted text-xs leading-5">“可写入并操作”允许助手直接创建、修改、移动和删除文件夹内的内容及子文件夹。保存后生效；本地文件夹完全操作权限开启时优先按完全权限执行。</p>
+                <p className="moki-ui-muted text-xs leading-5">{uiText("“可写入并操作”允许助手直接创建、修改、移动和删除文件夹内的内容及子文件夹。保存后生效；本地文件夹完全操作权限开启时优先按完全权限执行。")}</p>
               </div> : null}
               {!editingItem && createMode === "file" ? (
-                <label className="grid gap-1.5 text-[0.6875rem] font-bold">
-                  文件类型
-                  <select
+                <label className="grid gap-1.5 text-[0.6875rem] font-bold">{uiText("文件类型")}<select
                     value={fileFormat}
                     onChange={(event) =>
                       setFileFormat(event.target.value as typeof fileFormat)
@@ -4161,27 +4103,25 @@ export function LibraryPage() {
                     className="h-10 rounded-xl border border-[#dedfea] px-3"
                   >
                     <option value="markdown">Markdown (.md)</option>
-                    <option value="csv">CSV 表格 (.csv)</option>
+                    <option value="csv">{uiText("CSV 表格 (.csv)")}</option>
                     <option value="docx">Word (.docx)</option>
                     <option value="xlsx">Excel (.xlsx)</option>
                     <option value="pptx">PowerPoint (.pptx)</option>
-                    <option value="univer">Univer 多 Unit (.univer)</option>
+                    <option value="univer">{uiText("Univer 多 Unit (.univer)")}</option>
                   </select>
                 </label>
               ) : null}
               {!editingItem && createMode === "file" && fileFormat === "univer" ? (
-                <label className="grid gap-1.5 text-[0.6875rem] font-bold">
-                  初始组件
-                  <select
+                <label className="grid gap-1.5 text-[0.6875rem] font-bold">{uiText("初始组件")}<select
                     value={univerUnitKind}
                     onChange={(event) => setUniverUnitKind(event.target.value as typeof univerUnitKind)}
                     className="h-10 rounded-xl border border-[#dedfea] px-3"
                   >
-                    <option value="sheet">表格</option>
-                    <option value="doc">文档</option>
-                    <option value="slide">幻灯片</option>
-                    <option value="base">Base 数据库</option>
-                    <option value="board">白板</option>
+                    <option value="sheet">{uiText("表格")}</option>
+                    <option value="doc">{uiText("文档")}</option>
+                    <option value="slide">{uiText("幻灯片")}</option>
+                    <option value="base">{uiText("Base 数据库")}</option>
+                    <option value="board">{uiText("白板")}</option>
                   </select>
                 </label>
               ) : null}
@@ -4189,8 +4129,8 @@ export function LibraryPage() {
               (editingItem && editingItem.kind !== "folder") ? (
                 <label className="grid gap-1.5 text-[0.6875rem] font-bold">
                   {kind === "url" || editingItem?.kind === "url"
-                    ? "在线链接"
-                    : "本地路径"}
+                    ? uiText("在线链接")
+                    : uiText("本地路径")}
                   <div className="flex gap-2">
                     <input
                       value={target}
@@ -4199,8 +4139,8 @@ export function LibraryPage() {
                         kind === "url"
                           ? "https://example.com/file.pdf"
                           : kind === "local_folder"
-                            ? "C:\\Projects\\资料文件夹"
-                            : "C:\\Projects\\资料.pdf"
+                            ? uiText("C:\\Projects\\资料文件夹")
+                            : uiText("C:\\Projects\\资料.pdf")
                       }
                       className="h-10 min-w-0 flex-1 rounded-xl border border-[#dedfea] px-3"
                     />
@@ -4218,13 +4158,11 @@ export function LibraryPage() {
                             try {
                               const path = await window.mokiDesktop?.selectLibraryFile?.();
                               if (path) { setKind("local_file"); setTarget(path); }
-                            } catch (error) { setMessage(error instanceof Error ? error.message : "文件选择失败"); }
+                            } catch (error) { setMessage(error instanceof Error ? error.message : uiText("文件选择失败")); }
                           }}
                           className="library-pick-path"
                         >
-                          <FileUp size={14} />
-                          选择文件
-                        </button>
+                          <FileUp size={14} />{uiText("选择文件")}</button>
                       </>
                     ) : null}
                     {kind === "local_folder" && !editingItem ? (
@@ -4233,70 +4171,54 @@ export function LibraryPage() {
                         onClick={() => void handlePickFolder()}
                         className="library-pick-path"
                       >
-                        <FolderInput size={14} />
-                        选择文件夹
-                      </button>
+                        <FolderInput size={14} />{uiText("选择文件夹")}</button>
                     ) : null}
                   </div>
                   {kind === "local_file" ? (
-                    <span className="font-normal text-[#999fb0]">
-                      可粘贴文件的完整路径。
-                    </span>
+                    <span className="font-normal text-[#999fb0]">{uiText("可粘贴文件的完整路径。")}</span>
                   ) : kind === "local_folder" ? (
-                    <span className="font-normal text-[#999fb0]">
-                      保存后同步映射文件夹内的层级和文件；不会复制或上传文件内容。
-                    </span>
+                    <span className="font-normal text-[#999fb0]">{uiText("保存后同步映射文件夹内的层级和文件；不会复制或上传文件内容。")}</span>
                   ) : null}
                 </label>
               ) : null}
-              <label className="grid gap-1.5 text-[0.6875rem] font-bold">
-                显示名称
-                <input
+              <label className="grid gap-1.5 text-[0.6875rem] font-bold">{uiText("显示名称")}<input
                   autoFocus
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder={
-                    createMode === "file" ? "例如：项目方案" : undefined
+                    createMode === "file" ? uiText("例如：项目方案") : undefined
                   }
                   className="h-10 rounded-xl border border-[#dedfea] px-3"
                 />
               </label>
               {!editingItem && createMode === "file" && fileFormat !== "univer" ? (
-                <label className="grid gap-1.5 text-[0.6875rem] font-bold">
-                  初始内容
-                  <textarea
+                <label className="grid gap-1.5 text-[0.6875rem] font-bold">{uiText("初始内容")}<textarea
                     value={fileContent}
                     onChange={(event) => setFileContent(event.target.value)}
                     rows={7}
                     placeholder={
                       fileFormat === "csv"
-                        ? "每行使用逗号分隔；含逗号或换行的单元格请使用双引号"
+                        ? uiText("每行使用逗号分隔；含逗号或换行的单元格请使用双引号")
                         : fileFormat === "xlsx"
-                        ? "每行将成为一行单列表格"
+                        ? uiText("每行将成为一行单列表格")
                         : fileFormat === "pptx"
-                          ? "每行将成为首张幻灯片的一个文本块"
-                          : "可留空，创建后继续编辑"
+                          ? uiText("每行将成为首张幻灯片的一个文本块")
+                          : uiText("可留空，创建后继续编辑")
                     }
                     className="resize-y rounded-xl border border-[#dedfea] px-3 py-2 font-mono text-xs leading-6 outline-none focus:border-[#8a83d9]"
                   />
-                  <span className="font-normal text-[#999fb0]">
-                    创建后会自动打开统一预览编辑器。
-                  </span>
+                  <span className="font-normal text-[#999fb0]">{uiText("创建后会自动打开统一预览编辑器。")}</span>
                 </label>
               ) : !editingItem && createMode === "file" ? (
-                <p className="rounded-xl bg-[#f5f4ff] px-3 py-2 text-[0.6875rem] leading-5 text-[#625bc5]">
-                  将由官方 Gateway 创建原生工作区；进入编辑器后可继续增加文档、表格、幻灯片、Base 和白板 Unit。
-                </p>
+                <p className="rounded-xl bg-[#f5f4ff] px-3 py-2 text-[0.6875rem] leading-5 text-[#625bc5]">{uiText("将由官方 Gateway 创建原生工作区；进入编辑器后可继续增加文档、表格、幻灯片、Base 和白板 Unit。")}</p>
               ) : null}
               {editingItem ? (
-                <label className="grid gap-1.5 text-[0.6875rem] font-bold">
-                  所在虚拟目录
-                  <select
+                <label className="grid gap-1.5 text-[0.6875rem] font-bold">{uiText("所在虚拟目录")}<select
                     value={parentIdDraft}
                     onChange={(event) => setParentIdDraft(event.target.value)}
                     className="h-10 rounded-xl border border-[#dedfea] px-3"
                   >
-                    <option value="">资料库根目录</option>
+                    <option value="">{uiText("资料库根目录")}</option>
                     {folderOptions
                       .filter((folder) => folder.id !== editingItem.id)
                       .map((folder) => (
@@ -4326,16 +4248,14 @@ export function LibraryPage() {
                 type="button"
                 onClick={resetDialog}
                 className="rounded-xl bg-[#f4f5f8] px-4 py-2 text-[0.75rem] font-bold"
-              >
-                取消
-              </button>
+              >{uiText("取消")}</button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void saveDialog()}
                 className="rounded-xl bg-[#242a40] px-4 py-2 text-[0.75rem] font-bold text-white disabled:opacity-50"
               >
-                {busy ? "保存中..." : "保存"}
+                {busy ? uiText("保存中...") : uiText("保存")}
               </button>
             </footer>
           </section>

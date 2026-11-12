@@ -1,3 +1,4 @@
+import { l as uiText } from './i18n.js';
 const selectionType = 'application/x-moki-library-selection'
 
 function collect(entry, token) {
@@ -5,7 +6,7 @@ function collect(entry, token) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       channel.port1.close()
-      reject(new Error('读取拖动的资料超时'))
+      reject(new Error(uiText("读取拖动的资料超时")))
     }, 60000)
     channel.port1.onmessage = ({data}) => {
       clearTimeout(timer)
@@ -41,7 +42,7 @@ export function installLibraryDrag(ctx, update, quote) {
       if (!card.contains(hit)) continue
       const overlay = document.createElement('iframe')
       overlay.className='ml-chat-drop-target'
-      overlay.title='拖入资料到 DSH 对话'
+      overlay.title=uiText("拖入资料到 DSH 对话")
       overlay.tabIndex=-1
       overlay.setAttribute('aria-hidden','true')
       Object.assign(overlay.style,{left:bounds.left+'px',top:bounds.top+'px',width:bounds.width+'px',height:bounds.height+'px'})
@@ -82,11 +83,11 @@ export function installLibraryDrag(ctx, update, quote) {
     try {
       const [{files,references,asReference}] = await Promise.all([collect(entry, token), ref.ready])
       const fileInput = card.querySelector('input[type=file]')
-      if (!card.isConnected || card.closest('[data-conversation-session]')?.dataset.conversationSession !== id || !fileInput || fileInput.disabled) throw new Error('目标对话已切换或暂时无法添加资料，请重试')
+      if (!card.isConnected || card.closest('[data-conversation-session]')?.dataset.conversationSession !== id || !fileInput || fileInput.disabled) throw new Error(uiText("目标对话已切换或暂时无法添加资料，请重试"))
       const actions = ctx.uiSession.adapter.bindingSource(ref).getSnapshot().props.inputActions
       if (references.length) {
         const selection = {label:references.map(item => item.name).join('、'), content:JSON.stringify({selectedItems:references})}
-        if (!actions.insertQuote(quote(selection))) throw new Error('当前对话暂时无法接收资料')
+        if (!actions.insertQuote(quote(selection))) throw new Error(uiText("当前对话暂时无法接收资料"))
         actions.persistDraft()
       }
       if (files.length) {
@@ -96,7 +97,7 @@ export function installLibraryDrag(ctx, update, quote) {
         fileInput.dispatchEvent(new Event('change', {bubbles:true}))
       }
       card.querySelector('[data-composer-input]')?.focus({preventScroll:true})
-      if (asReference.length) update(entry,{notice:'以下文件以资料库引用加入：'+asReference.join('、')})
+      if (asReference.length) update(entry,{notice:uiText("以下文件以资料库引用加入：")+asReference.join('、')})
     } catch (error) { update(entry,{notice:error.message}) }
     finally { ref.release() }
   }

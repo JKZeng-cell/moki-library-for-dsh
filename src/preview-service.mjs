@@ -31,7 +31,7 @@ export function createPreviewService({find,makeFrame,dropFrame,origin,chatHost,b
       windows.set(id,record)
       chats.set(record.chatKey,record)
       const url=new URL('/view/'+frame.key+'/index.html',origin())
-      url.search=new URLSearchParams({document:id,mode:'window',theme:appearance.dark?'dark':'light'})
+      url.search=new URLSearchParams({document:id,mode:'window',theme:appearance.dark?'dark':'light',locale:appearance.locale || 'zh'})
       if(office)url.searchParams.set('resumeOffice','1')
       record.opening=browser.open(url.href).then(page=>{
         record.page=page

@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 import {zip} from "fflate";
 import type {ResourceLibraryItem} from "../../shared/resource-library-contract.js";
 import {getResourceLibraryAttachment} from "./resource-library-api.js";
@@ -17,10 +18,10 @@ export function warmNativeFileDrag() {
 }
 
 export function requestParent<T>(type: string, fields: object, timeout: number): Promise<T> {
-  if (!parentOrigin) return Promise.reject(new Error("DSH 工作区未连接"));
+  if (!parentOrigin) return Promise.reject(new Error(uiText("DSH 工作区未连接")));
   const channel = new MessageChannel();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { channel.port1.close(); reject(new Error("DSH 文件操作等待超时")); }, timeout);
+    const timer = setTimeout(() => { channel.port1.close(); reject(new Error(uiText("DSH 文件操作等待超时"))); }, timeout);
     channel.port1.onmessage = ({data}) => {
       clearTimeout(timer);
       channel.port1.close();
@@ -47,7 +48,7 @@ export function endLibraryDrag() {
 }
 
 export async function collectDragFiles(token: string) {
-  if (!selection || token !== selection.token) throw new Error("拖动的资料已失效，请重新拖动");
+  if (!selection || token !== selection.token) throw new Error(uiText("拖动的资料已失效，请重新拖动"));
   const {items} = selection;
   const files: File[] = [];
   const references: Array<Pick<ResourceLibraryItem, "id" | "name" | "kind" | "target">> = [];
@@ -85,7 +86,7 @@ function releaseExport() {
 
 async function exportFile(item: ResourceLibraryItem, signal: AbortSignal) {
   const response = await apiFetch(`/api/library/items/${encodeURIComponent(item.id)}/preview`, {signal});
-  if (!response.ok) throw new Error(`无法读取“${item.name}”`);
+  if (!response.ok) throw new Error(uiText`无法读取“${item.name}”`);
   const name = item.target?.split(/[\\\\/]/u).pop() || item.name;
   return new File([await response.blob()], name, {type:response.headers.get("content-type") || "application/octet-stream"});
 }
@@ -107,11 +108,11 @@ async function exportSelection(items: ResourceLibraryItem[], signal: AbortSignal
   signal.throwIfAborted();
   const packed = await new Promise<Uint8Array>((resolve,reject) =>
     zip(entries,{level:0},(error,bytes) => error ? reject(error) : resolve(bytes)));
-  return new File([packed], `资料库文件（${items.length}项）.zip`, {type:"application/zip"});
+  return new File([packed], uiText`资料库文件（${items.length}项）.zip`, {type:"application/zip"});
 }
 
 function prepare(items: ResourceLibraryItem[]) {
-  if (!items.length || items.some(item=>item.kind!=="local_file")) throw new Error("请选择本地文件拖出");
+  if (!items.length || items.some(item=>item.kind!=="local_file")) throw new Error(uiText("请选择本地文件拖出"));
   const key = items.map(item=>[item.id,item.updatedAt].join("/")).join("|");
   if (prepared?.key===key && prepared.expires>Date.now()) return prepared;
   releaseExport();
@@ -131,7 +132,7 @@ export function prepareFileExport(items: ResourceLibraryItem[]) {
 export async function exportDraggedFiles(items: ResourceLibraryItem[]) {
   if (nativeFileDrag) {
     const response = await apiFetch("/api/dsh/drag-files",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ids:items.map(item=>item.id)})});
-    if (!response.ok) throw new Error((await response.json()).error || "系统文件拖出失败");
+    if (!response.ok) throw new Error((await response.json()).error || uiText("系统文件拖出失败"));
     return;
   }
   const selection=prepare(items);
@@ -144,7 +145,7 @@ export async function exportDraggedFiles(items: ResourceLibraryItem[]) {
   try {
     await selection.ready;
     if (selection!==prepared) return;
-    if (cancelled) throw new Error("文件已准备好，可以再次拖出");
+    if (cancelled) throw new Error(uiText("文件已准备好，可以再次拖出"));
     pending.abort();
     await requestParent("start-export",{token:selection.token},10000);
   } finally {

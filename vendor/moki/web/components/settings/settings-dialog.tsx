@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../../src/i18n.js';
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, X } from "lucide-react";
@@ -62,10 +63,10 @@ export function SettingsDialog({ title, onClose, busy = false, containedScroll =
       }}
       className={`moki-settings-dialog moki-ui-dialog m-auto w-[calc(100%-32px)] max-w-3xl p-0 backdrop:bg-[#242a40]/35 backdrop:backdrop-blur-sm ${containedScroll ? "flex h-[calc(100dvh-64px)] max-h-[860px] flex-col overflow-hidden" : "max-h-[calc(100dvh-40px)] overflow-y-auto"} ${className}`}>
       <header className={`moki-dialog-header moki-settings-dialog-header ${scrollBody ? "flex-none" : "sticky top-0"} z-10 flex items-center justify-between gap-4 border-b border-[#e7e9f2] bg-white px-5 py-4`}>
-        {parentTitle ? <div className="moki-settings-dialog-heading"><IconButton aria-label={`返回${parentTitle}`} disabled={busy || suspended} onClick={close} className="moki-settings-dialog-back"><ArrowLeft size={16} aria-hidden="true" /></IconButton><h2 className="font-extrabold">{title}</h2></div> : <h2 className="font-extrabold">{title}</h2>}
+        {parentTitle ? <div className="moki-settings-dialog-heading"><IconButton aria-label={uiText`返回${parentTitle}`} disabled={busy || suspended} onClick={close} className="moki-settings-dialog-back"><ArrowLeft size={16} aria-hidden="true" /></IconButton><h2 className="font-extrabold">{title}</h2></div> : <h2 className="font-extrabold">{title}</h2>}
         <div className="ml-auto flex min-w-0 items-center gap-3">
           {headerAction}
-          <IconButton aria-label={`关闭${title}`} disabled={busy || suspended} onClick={close} className="moki-settings-dialog-close"><X size={16} /></IconButton>
+          <IconButton aria-label={uiText`关闭${title}`} disabled={busy || suspended} onClick={close} className="moki-settings-dialog-close"><X size={16} /></IconButton>
         </div>
       </header>
       <div data-settings-dialog-scroll={scrollBody ? "true" : undefined} className={`moki-settings-dialog-body ${scrollBody ? "min-h-0 flex-1 overflow-y-auto p-5" : "p-5"}`}>{children}</div>

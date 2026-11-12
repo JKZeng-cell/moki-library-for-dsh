@@ -1,3 +1,4 @@
+import { l as uiText, setLocale, getLocale, useLibraryLocale } from '../src/i18n.js';
 import React from 'react'
 import {createRoot} from 'react-dom/client'
 import { LibraryPage } from '../vendor/moki/web/pages/library-page'
@@ -17,11 +18,14 @@ const query=new URLSearchParams(location.search)
 const parentOrigin=query.get('parent') || '', bridge=query.get('bridge') || ''
 const standalone=query.get('mode')==='window', documentId=query.get('document')
 let active=standalone,seq=0
+let documentName=''
 let chatId:string|null=query.get('chatId'), previewId:string|null=documentId
 let selection: {label:string;content:string;itemCount:number}|null=null
 let imagePending:Promise<unknown>=Promise.resolve()
 const send=(type:string,value:object={})=>{if(parentOrigin && parent!==window)parent.postMessage({bridge,type,...value},parentOrigin)}
-function applyAppearance({dark,theme,font,rootSize}:Record<string,unknown>) {
+function applyAppearance({dark,theme,font,rootSize,locale}:Record<string,unknown>) {
+  if(typeof locale==='string')setLocale(locale)
+  document.documentElement.lang=getLocale()==='zh'?'zh-CN':'en'
   document.documentElement.dataset.colorScheme=dark?'dark':'light'
   for(const [name,value] of Object.entries(theme || {})) {
     if(/^--dsw-(?:alias|font|radius)-[a-z0-9-]+$/.test(name) && typeof value==='string') document.documentElement.style.setProperty(name,value)
@@ -32,7 +36,7 @@ function applyAppearance({dark,theme,font,rootSize}:Record<string,unknown>) {
 function documentError(error:unknown){window.dispatchEvent(new CustomEvent('moki:document-error',{detail:error instanceof Error?error.message:String(error)}))}
 async function post(path:string,data:object) {
   const result=await apiFetch('/api/dsh/'+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)})
-  if(!result.ok) throw new Error((await result.json()).error || 'DSH 连接失败')
+  if(!result.ok) throw new Error((await result.json()).error || uiText("DSH 连接失败"))
   return result.json()
 }
 async function publish(focused=false) {
@@ -101,7 +105,7 @@ window.addEventListener('message',event=>{
     chatId=event.data.sessionId
     void publish(true)
   }
-  if(event.data.type==='focus-editor') document.querySelector<HTMLElement>('.dsh-file-view textarea, .dsh-file-view iframe[title*="Univer Office 编辑器"]')?.focus()
+  if(event.data.type==='focus-editor') document.querySelector<HTMLElement>('.dsh-file-view textarea, .dsh-file-view iframe[data-office-editor]')?.focus()
 })
 // A native window retains its capability across reloads. Its OS window owns cleanup.
 if(!standalone)window.addEventListener('pagehide',()=>{navigator.sendBeacon(new URL('./api/dsh/close',location.href),'')})
@@ -111,7 +115,7 @@ async function poll() {
   polling=true
   try {
     const response=await apiFetch('/api/dsh/changes?after='+after)
-    if(!response.ok)throw new Error('资料库连接中断')
+    if(!response.ok)throw new Error(uiText("资料库连接中断"))
     const update=await response.json()
     after=update.version
     if(update.changes.some((e:{operation:string})=>e.operation!=='office-draft')) window.dispatchEvent(new Event('moki:catalog-updated'))
@@ -128,7 +132,8 @@ window.addEventListener('moki:library-location',event=>{
 })
 document.documentElement.dataset.colorScheme=query.get('theme')==='dark'?'dark':'light'
 const initializeDocument=(data:Parameters<React.ComponentProps<typeof DocumentPreview>['initialize']>[0])=>{
-  document.title=data.item.name+' · MOKI资料库'
+  documentName=data.item.name
+  document.title=data.item.name+uiText(" · MOKI资料库")
   if(standalone){chatId=data.chatId || null;if(data.appearance)applyAppearance(data.appearance)}
   send('location',{itemId:documentId,previewing:true});void publish()
 }
@@ -150,10 +155,16 @@ if(standalone){
 } else if(documentId){
   window.addEventListener('focus',()=>{if(active)void publish(true)})
 }
-createRoot(document.getElementById('root')!).render(<PageStateProvider>{documentId
+function LocalizedLibrary(){
+  useLibraryLocale(React)
+  document.documentElement.lang=getLocale()==='zh'?'zh-CN':'en'
+  document.title=(documentName?documentName+' · ':'')+uiText('MOKI资料库')
+  return <PageStateProvider>{documentId
   ? <DocumentPreview standalone={standalone} resumeOffice={query.get('resumeOffice')==='1'} initialize={initializeDocument} close={closeDocument} chatAction={previewChatAction}
       dock={async (office,destination)=>{await post('document-action',{action:destination==='main'?'main':'dock',office})}}/>
-  : <LibraryPage/>}</PageStateProvider>)
+  : <LibraryPage/>}</PageStateProvider>
+}
+createRoot(document.getElementById('root')!).render(<LocalizedLibrary/>)
 send('ready')
 warmNativeFileDrag()
 void poll()

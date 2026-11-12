@@ -1,3 +1,4 @@
+import { l as uiText } from '../../../../src/i18n.js';
 import type { ResourceLibraryItem } from "../../shared/resource-library-contract.js";
 
 function logicalPath(item: ResourceLibraryItem, byId: Map<string, ResourceLibraryItem>): string {
@@ -9,11 +10,11 @@ function logicalPath(item: ResourceLibraryItem, byId: Map<string, ResourceLibrar
     names.unshift(encodeURI(cursor.name).replaceAll("/", "%2F"));
     cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
   }
-  return `资料库/${names.join("/")}`;
+  return `${uiText("资料库")}/${names.join("/")}`;
 }
 
 export function resourceLibraryPath(item: ResourceLibraryItem | undefined, items: ResourceLibraryItem[]): string {
-  if (!item) return "资料库/";
+  if (!item) return `${uiText("资料库")}/`;
   if (item.target) return item.target;
   const byId = new Map(items.map((entry) => [entry.id, entry]));
   const path = logicalPath(item, byId);
@@ -36,16 +37,18 @@ function normalizePath(value: string): string {
 /** Resolve existing mappings only. Navigation must never create a mapping or copy a file. */
 export function resolveResourceLibraryPath(value: string, items: ResourceLibraryItem[]): ResourceLibraryItem | null {
   const path = normalizePath(value);
-  if (path === "资料库" || path === "/资料库" || path === "moki://library") return null;
+  if (/^(?:\/)?(?:资料库|Library)$/iu.test(path) || path === "moki://library") return null;
   const byId = new Map(items.map((entry) => [entry.id, entry]));
   const candidates = items.filter((item) => {
     if (path === `moki://library/${encodeURIComponent(item.id)}`) return true;
     if (item.target && normalizePath(item.target) === path) return true;
-    if (!/^\/?资料库\//u.test(path)) return false;
+    if (!/^\/?(?:资料库|Library)\//iu.test(path)) return false;
     const logical = logicalPath(item, byId);
-    return path.replace(/^\//u, "") === logical || path.replace(/^\//u, "") === decodeURIComponent(logical);
+    const relative = path.replace(/^\/?(?:资料库|Library)\//iu, "");
+    const expected = logical.slice(logical.indexOf("/") + 1);
+    return relative === expected || relative === decodeURIComponent(expected);
   });
-  if (candidates.length > 1) throw new Error("路径对应多个资料，请从文件夹列表选择具体位置。");
-  if (!candidates[0]) throw new Error("未找到该资料库路径，请检查路径或先添加文件夹映射。");
+  if (candidates.length > 1) throw new Error(uiText("路径对应多个资料，请从文件夹列表选择具体位置。"));
+  if (!candidates[0]) throw new Error(uiText("未找到该资料库路径，请检查路径或先添加文件夹映射。"));
   return candidates[0];
 }

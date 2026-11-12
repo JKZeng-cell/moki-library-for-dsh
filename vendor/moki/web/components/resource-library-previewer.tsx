@@ -509,6 +509,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const [insertingLibraryImage, setInsertingLibraryImage] = useState(false);
   const libraryImageSelectionRef = useRef<UniverImageSelection | undefined>(undefined);
   const [officeRevision, setOfficeRevision] = useState("");
+  const acceptedOfficeRevision = useRef("");
   const [pdfTextOpen, setPdfTextOpen] = useState(false);
   const [ocrProgress, setOcrProgress] = useState<{ currentPage: number; totalPages: number; phase: "rendering" | "recognizing" }>();
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
@@ -575,7 +576,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       if(current.saving) return;
       if(current.session) {
         if(!current.dirty) return;
-        if(syncFrame) await prepareOfficeEditorSave(current.session);
+        if(syncFrame) await prepareOfficeEditorSave(current.session,{preserveView:Boolean(officeReviews.length)||reviewBusy});
         const saved=await draftRequest<{savedAt:string}>(`univer-session/${current.session.sessionId}/checkpoint`,'POST',{});
         setAutosaveStatus(uiText`草稿已自动保存 · ${new Date(saved.savedAt).toLocaleTimeString()}`);
       } else if(current.editingText || current.dirty) {
@@ -655,11 +656,15 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     const poll=async()=>{try{await refreshReviewRef.current()}catch{}if(!stopped)timer=setTimeout(poll,1000);};
     void poll();return()=>{stopped=true;clearTimeout(timer);};
   },[univerSession?.sessionId]);
+  const officeReviewLocked=Boolean(officeReviews.length)||reviewRemoteBusy||reviewResolving;
   function postOfficeReview(locate?:ReviewChange) {
     const frame=officeEditorFrameRef.current;if(!frame?.contentWindow)return;
-    frame.contentWindow.postMessage({type:'moki:univer-review',changes:officeReviewHighlights,locate},new URL(frame.src).origin);
+    // Preparation must still flush the user's in-progress cell/text edit.
+    // The input shield covers that brief phase; gate mutations only once the
+    // remote edit or its review is active.
+    frame.contentWindow.postMessage({type:'moki:univer-review',changes:officeReviewHighlights,locked:officeReviewLocked,locate},new URL(frame.src).origin);
   }
-  useEffect(()=>{postOfficeReview();},[officeReviewHighlights]);
+  useEffect(()=>{postOfficeReview();},[officeReviewHighlights,officeReviewLocked]);
   async function persistTextReview(content:string,review:TextReview[]) {
     const pending=autosavePending.current.catch(()=>undefined).then(()=>draftRequest('draft','PUT',{content,version:textSourceVersion,review}));
     autosavePending.current=pending.then(()=>undefined);await pending;
@@ -668,21 +673,37 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   async function resolveEditReview(action:'accept'|'reject',expectedId:string) {
     if(reviewBusy)return;
     setReviewResolving(true);
+    if(action==='accept')setSaving(true);
     try {
       if(editingText) {
         const latest=textReviews.at(-1);if(latest?.id!==expectedId)throw new Error(uiText('待确认版本已变化，请查看最新修改后再操作'));
         const content=action==='reject'?latest.before:textContent;
         const entries=action==='reject'?textReviews.slice(0,-1):[];
-        await persistTextReview(content,entries);
-        setTextContent(content);setTextReviews(entries);setDirty(content!==savedTextContent);setTextHistory({undo:[],redo:[]});
+        if(action==='accept'){
+          await autosavePending.current.catch(()=>undefined);
+          const saved=await saveResourceLibraryTextContent(item.id,content,textSourceVersion);
+          setTextSourceVersion(saved.version);setSavedTextContent(content);
+          checkpointState.current={...checkpointState.current,textContent:content,textSourceVersion:saved.version,review:[],dirty:false};
+          lastTextCheckpoint.current=JSON.stringify([content,saved.version,[]]);
+          // The source write has committed. Cleanup must not put the accepted
+          // edit back into review if a transient draft-store request fails.
+          await draftRequest('draft','DELETE').catch(()=>draftRequest('draft','PUT',{content,version:saved.version,review:[]}).catch(()=>undefined));
+          setAutosaveStatus('');
+        }else await persistTextReview(content,entries);
+        setTextContent(content);setTextReviews(entries);setDirty(action==='reject'&&content!==savedTextContent);setTextHistory({undo:[],redo:[]});
       } else {
         const session=univerSessionRef.current;if(!session)return;
-        await draftRequest(`univer-session/${session.sessionId}/review`,'POST',{action,expectedId});
+        if(action==='accept'){
+          await autosavePending.current.catch(()=>undefined);
+          await prepareOfficeEditorSave(session,{preserveView:true});
+        }
+        const result=await draftRequest<{saved?:boolean;updatedAt?:string}>(`univer-session/${session.sessionId}/review`,'POST',{action,expectedId,save:action==='accept'});
         await refreshOfficeReview();
+        if(result.saved){acceptedOfficeRevision.current=result.updatedAt||new Date().toISOString();setDirty(false);setAutosaveStatus('');checkpointState.current={...checkpointState.current,dirty:false};}
       }
-      setNotice(action==='accept'?uiText('已采纳 AI 修改，可继续编辑或保存'):uiText('已取消最新一次 AI 修改，之前的内容已保留'));
+      setNotice(action==='accept'?uiText('已采纳并保存到原文件，当前页面保持不变'):uiText('已取消最新一次 AI 修改，之前的内容已保留'));
     } catch(error) {setNotice(error instanceof Error?error.message:String(error));}
-    finally {setReviewResolving(false);}
+    finally {setReviewResolving(false);if(action==='accept')setSaving(false);}
   }
   function locateReview(change:ReviewChange) {
     if(univerSession){postOfficeReview(change.kind==='document'?officeReviewHighlights.find(current=>current.unitId===change.unitId&&current.kind==='document')??change:change);return;}
@@ -779,6 +800,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       void discardOfficeSession(previousUniverSession).catch(() => undefined);
     }
     setOfficeRevision("");
+    acceptedOfficeRevision.current="";
     setPdfTextOpen(false);
     setOcrProgress(undefined);
     setActiveSheetIndex(0);
@@ -1085,6 +1107,18 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     }
   }
 
+  function restoreSavedOfficePreview() {
+    const revision=acceptedOfficeRevision.current;
+    if(!revision){setStructuredPreview(savedStructuredPreview ? structuredClone(savedStructuredPreview) : undefined);return;}
+    // Refresh the read-only preview only when leaving the live editor, never
+    // while accepting an edit. Its previous cache predates the accepted save.
+    acceptedOfficeRevision.current="";
+    setStructuredPreview(undefined);setSavedStructuredPreview(undefined);setOfficeRevision(revision);
+    if(kind!=="workspace")void getResourceLibraryStructuredPreview(item.id).then(preview=>{
+      setStructuredPreview(preview);setSavedStructuredPreview(structuredClone(preview));
+    }).catch(()=>undefined);
+  }
+
   async function cancelOfficeEditing(propagate = false) {
     const session = univerSessionRef.current;
     if (!session) return;
@@ -1094,7 +1128,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       univerSessionRef.current = undefined;
       setUniverSession(undefined);
       setOfficeReviews([]);
-      setStructuredPreview(savedStructuredPreview ? structuredClone(savedStructuredPreview) : undefined);
+      restoreSavedOfficePreview();
       setEditingOffice(false);
       finishMokiEditorAssistance();
       setDirty(false);
@@ -1115,7 +1149,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     setDirty(true);
   }
 
-  async function prepareOfficeEditorSave(session: ResourceLibraryUniverSession): Promise<void> {
+  async function prepareOfficeEditorSave(session: ResourceLibraryUniverSession, options:{preserveView?:boolean}={}): Promise<void> {
     const frame = officeEditorFrameRef.current;
     const target = frame?.contentWindow;
     if (!frame || !target) throw new Error(uiText("Office 编辑器尚未就绪，无法同步保存"));
@@ -1138,7 +1172,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       };
       const timeout = window.setTimeout(() => finish(false), 10_000);
       window.addEventListener("message", handleMessage);
-      target.postMessage({ type: "moki:univer-prepare-save", requestId }, expectedOrigin);
+      target.postMessage({ type: "moki:univer-prepare-save", requestId, preserveView:options.preserveView===true }, expectedOrigin);
     });
     if (!synced) throw new Error(uiText("编辑内容仍在同步，请稍后再次保存"));
   }
@@ -1183,12 +1217,10 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     if (!univerSession?.viewerUrl) return undefined;
     const url = new URL(univerSession.viewerUrl, window.location.href);
     url.searchParams.set("lang", intlLocale());
-    // Progress is protected by the review shield. Changing the URL for every
-    // prepare/refresh pair reloads the entire editor, even for read-only calls.
-    // Only a real, pending edit needs the persistent read-only review surface.
-    if(officeReviews.length)url.searchParams.set('editable','false');
+    // Review locks mutations inside the existing viewer. Keep this URL stable
+    // across pending/accepted states so page, zoom and selection stay intact.
     return url.href;
-  }, [univerSession?.viewerUrl,Boolean(officeReviews.length)]);
+  }, [univerSession?.viewerUrl]);
   useEffect(() => {
     if (!univerSession?.viewerUrl) return;
     const observer = new MutationObserver(syncOfficeTheme);
@@ -1262,6 +1294,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       finishMokiEditorAssistance();
       setDirty(false);
       setOfficeRevision(result.updatedAt);
+      acceptedOfficeRevision.current="";
       setNotice(kind === "workspace" ? uiText("已确认合并 Univer 草稿，并原子保存到原生工作区文件") : uiText("已确认合并 Univer 草稿，并原子保存到原 Office 文件"));
       // The save response is authoritative. Rebuilding the read-only preview
       // can take much longer for rich Word files, so it must not keep the Save
@@ -1300,7 +1333,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       univerSessionRef.current = undefined;
       setUniverSession(undefined);
       setOfficeReviews([]);
-      setStructuredPreview(savedStructuredPreview ? structuredClone(savedStructuredPreview) : undefined);
+      restoreSavedOfficePreview();
       setEditingOffice(false);
       finishMokiEditorAssistance();
       setDirty(false);
@@ -1874,7 +1907,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
           <IconButton aria-label={uiText("关闭预览")} onClick={() => void requestEditorExit("close")}><X size={16}/></IconButton>
         </div>
       </header>
-      <EditReviewBar entries={reviewEntries} busy={reviewBusy} onResolve={(action,id)=>void resolveEditReview(action,id)} onLocate={locateReview}/>
+      <EditReviewBar entries={reviewEntries} busy={reviewBusy} status={reviewResolving?(saving?uiText('正在保存…'):uiText('正在取消修改…')):undefined} onResolve={(action,id)=>void resolveEditReview(action,id)} onLocate={locateReview}/>
       {exitIntent ? <LibraryDialog titleId="library-save-title" size="small" onDismiss={()=>{if (!saving) setExitIntent(undefined);}}>
         <section className="library-dialog-card">
           <header><h3 id="library-save-title">{uiText("保存对“")}{item.name}{uiText("”的修改？")}</h3></header>
@@ -1895,7 +1928,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
           <iframe
             ref={officeEditorFrameRef}
             data-office-editor="true"
-            inert={reviewBusy || undefined}
+            inert={(reviewBusy&&!reviewResolving) || undefined}
             src={officeViewerUrl}
             title={uiText`${item.name} Univer Office 编辑器`}
             allow="clipboard-read; clipboard-write"

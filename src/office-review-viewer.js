@@ -1,7 +1,7 @@
 // Runs inside the pinned Office viewer. Decorations belong to the render layer;
 // none of the highlights are written into a cell, paragraph or slide snapshot.
 export function installOfficeReview() {
-  let changes=[],locate,signature='',decorations=[],pending=true
+  let changes=[],locate,signature='',decorations=[],pending=true,locked=false,retainedDocView,restoreTimer
   const find=(unit,matches)=>{
     const queue=[unit?._injector,window.univerAPI?._injector],seen=new Set()
     while(queue.length){const injector=queue.shift();if(!injector||seen.has(injector))continue;seen.add(injector)
@@ -10,6 +10,30 @@ export function installOfficeReview() {
     }
   }
   const clear=()=>{for(const item of decorations)try{item.dispose()}catch{}decorations=[];document.documentElement.removeAttribute('data-moki-review-highlights')}
+  const rememberDocumentView=()=>{
+    const api=window.univerAPI,doc=!api?.getActivePresentation?.()&&api?.getActiveDocument?.()
+    if(!doc)return
+    const manager=find(doc,v=>typeof v?.addDocRanges==='function'&&typeof v?.getAllTextRanges==='function')
+    if(manager)retainedDocView={unitId:doc.getId(),manager,ranges:manager.getAllTextRanges().map(({startOffset,endOffset})=>({startOffset,endOffset,rangeType:'TEXT'})),segmentId:manager._currentSegmentId,segmentPage:manager._currentSegmentPage}
+  }
+  const restoreDocumentView=()=>{
+    clearTimeout(restoreTimer)
+    const view=retainedDocView;if(!view)return
+    // Removing the review bar resizes the Word canvas. Its hidden input can
+    // reset the range to 0 during that resize; restore the user's range after
+    // layout settles, without focusing, scrolling, or touching document data.
+    restoreTimer=setTimeout(()=>{
+      if(retainedDocView!==view||window.univerAPI?.getActiveDocument?.()?.getId()!==view.unitId)return
+      retainedDocView=undefined
+      const manager=view.manager
+      manager.removeAllRanges()
+      manager._currentSegmentId=view.segmentId;manager._currentSegmentPage=view.segmentPage
+      manager.addDocRanges(view.ranges,false,{shouldFocus:false})
+    },120)
+  }
+  const releaseDocumentView=()=>{retainedDocView=undefined;clearTimeout(restoreTimer)}
+  document.addEventListener('pointerdown',releaseDocumentView,true)
+  document.addEventListener('keydown',releaseDocumentView,true)
   const style=()=>({stroke:'#51ad7b',strokeWidth:2,fill:document.documentElement.dataset.dshTheme==='dark'?'rgba(93,213,149,0.22)':'rgba(49,168,104,0.18)'})
   function paint() {
     const api=window.univerAPI;if(!api)return
@@ -62,10 +86,14 @@ export function installOfficeReview() {
   }
   window.addEventListener('message',event=>{
     if(event.source!==window.parent||event.data?.type!=='moki:univer-review')return
+    locked=event.data.locked===true
+    window.__mokiSetReviewLocked?.(locked)
     const first=!changes.length,incoming=Array.isArray(event.data.changes)?event.data.changes.slice(-1000):[]
+    if(changes.length&&!incoming.length)rememberDocumentView()
     pending ||= JSON.stringify(incoming)!==JSON.stringify(changes);changes=incoming
     locate=event.data.locate||(first&&changes[0]?.kind!=='document'?changes[0]:null)
+    if(!locked)restoreDocumentView()
   })
-  const timer=setInterval(()=>{if(locate&&focusChange(locate))locate=null;paint()},200)
-  window.addEventListener('pagehide',()=>{clearInterval(timer);clear()},{once:true})
+  const timer=setInterval(()=>{window.__mokiSetReviewLocked?.(locked);if(locate&&focusChange(locate))locate=null;paint()},200)
+  window.addEventListener('pagehide',()=>{clearInterval(timer);releaseDocumentView();clear()},{once:true})
 }

@@ -29,7 +29,7 @@ The deck covers file organization, precise editing instructions, and review befo
 2. Choose **Add selection to conversation**. The reference includes the file, slide number, object ID and selected content. The example selects the title on slide 1 of `项目协作提案.pptx`.
 3. Ask, for example: “Replace the title selected on slide 1 with ‘Organized files, faster collaboration.’ Keep its font size, position and all other content. Update the draft for me to review before saving.”
 4. Select a configured model and send. Review the updated draft in the adjacent editor. **Alt+D** can also open DSH chat with the current selection.
-5. Review the highlighted edits and choose **Accept**, then **Save** or **Save As**. You can discard the edit, or continue with DSH to add another pending edit. Close and reopen to confirm the saved result.
+5. Review the highlighted edits and choose **Accept** to save to the original file while keeping the current slide and editor open. You can discard the edit, or continue with DSH to add another pending edit. Close and reopen to confirm the saved result. To retain the original, duplicate it before editing the copy.
 
 The promotional illustration uses purpose-made, local DSH Web demonstration captures. Its composer contains an **unsent draft**, not a fabricated assistant response. The sample deck was prepared in advance and imported into DSH; its decorative illustration is AI-generated. The captures show the actual file, title selection and reference input, not a claimed one-shot generation result.
 

@@ -777,7 +777,7 @@ return { applied };`,
       }
     });
   }
-  async resolveReview(sessionId:string,itemId:string,action:'accept'|'reject',expectedId:string) {
+  async resolveReview(sessionId:string,itemId:string,action:'accept'|'reject',expectedId:string,options:{save?:boolean}={}) {
     return this.inSession(sessionId,async()=>{
       const session=this.requireEditableSession(sessionId,itemId),review=session.review,latest=review?.entries.at(-1);
       if(!latest || latest.id!==expectedId)throw new Error('待确认版本已变化，请查看最新修改后再操作');
@@ -796,10 +796,12 @@ return { applied };`,
           review!.entries.pop();
         } else review!.entries=[];
         if(!review!.entries.length && review!.baselineFile){released.push(review!.baselineFile);delete review!.baselineFile;}
-        // Persist the decision and snapshot together before acknowledging it.
-        await this.checkpoint(sessionId,itemId);
+        // Acceptance can save without retiring the live worktree. Keep the
+        // review snapshots until that write succeeds so failures remain retryable.
+        const saved=action==='accept'&&options.save?await this.save(sessionId,itemId,{keepSession:true}):undefined;
+        if(!saved)await this.checkpoint(sessionId,itemId);
         await this.removeReviewFiles(released);
-        return this.reviewStatus(sessionId,itemId);
+        return {...this.reviewStatus(sessionId,itemId),...(saved?{saved:true,...saved}:{})};
       } catch(error) {
         // A decision is acknowledged only after its immutable draft manifest is
         // committed. Keep the previous review available if persistence failed.
@@ -821,7 +823,11 @@ return { applied };`,
     if (session) session.hasChanges = true;
     let timers=checkpointTimers.get(this);if(!timers){timers=new Map();checkpointTimers.set(this,timers);}
     clearTimeout(timers.get(sessionId));
-    timers.set(sessionId,setTimeout(()=>{timers.delete(sessionId);this.sessionScope.exit(()=>{void this.checkpoint(sessionId).catch(()=>undefined);});},1500));
+    timers.set(sessionId,setTimeout(()=>{timers.delete(sessionId);this.sessionScope.exit(()=>{
+      // A timer may already be queued behind an accept/save. Check again once
+      // it owns the session so it cannot resurrect a draft after that save.
+      void this.inSession(sessionId,async()=>{if(this.sessions.get(sessionId)?.hasChanges)await this.checkpoint(sessionId);}).catch(()=>undefined);
+    });},1500));
   }
   async checkpoint(sessionId: string, itemId?: string): Promise<{savedAt:string}> {
     return this.inSession(sessionId,async()=>{
@@ -846,21 +852,45 @@ return { applied };`,
     if(session.review)await this.removeReviewFiles([...session.review.entries.map(entry=>entry.snapshot),...(session.review.baselineFile?[session.review.baselineFile]:[])]);
   }
 
-  async save(sessionId: string, itemId?: string): Promise<{ size: number; updatedAt: string }> {
+  private async finishSavedSession(session:RuntimeSession,keepSession=false) {
+    const saved=await stat(session.sourcePath);
+    if(keepSession){
+      Object.assign(session,{sourceSize:saved.size,sourceModifiedMs:saved.mtimeMs,hasChanges:false});
+      // The original is already committed. If deleting the recovery draft
+      // fails, replace it with the accepted baseline rather than roll back the
+      // review decision or make the next save conflict with our own write.
+      await this.clearCheckpoint(session).catch(()=>this.checkpoint(session.sessionId,session.itemId).catch(()=>undefined));
+      session.hasChanges=false;
+    }else{
+      await this.clearCheckpoint(session);
+      this.sessions.delete(session.sessionId);
+    }
+    return {size:saved.size,updatedAt:saved.mtime.toISOString()};
+  }
+
+  async save(sessionId: string, itemId?: string, options:{keepSession?:boolean}={}): Promise<{ size: number; updatedAt: string }> {
     return this.inSession(sessionId, async () => {
       const session = this.requireSession(sessionId, itemId);
       this.assertReviewed(session);
       return withFileEdit(session.sourcePath, undefined, async () => {
         await this.assertSourceUnchanged(session);
         if (session.sourceFormat === "univer") {
-          await this.mergeSessionWorktree(session);
-          const contents = await readFile(session.univerPath);
+          // Merge a copy for the saved native file; the visible worktree keeps
+          // its identity and can continue receiving manual or AI edits.
+          let copy:RuntimeSession|undefined;
+          if(options.keepSession){
+            // Keep the SQLite backup path shallow for Windows path limits.
+            const directory=join(this.stateDirectory,'univer-save',randomUUID());await mkdir(directory,{recursive:true});
+            const workspace=await realpath(directory);
+            copy={...session,workspace,univerPath:join(workspace,'document.univer')};
+            await this.copyReviewSnapshot(session.univerPath,copy.univerPath);
+          }
+          let contents:Buffer;
+          try {await this.mergeSessionWorktree(copy??session);contents=await readFile((copy??session).univerPath);}
+          finally {if(copy)await rm(copy.workspace,{recursive:true,force:true,maxRetries:5,retryDelay:100}).catch(()=>undefined);}
           if (!contents.length) throw new Error("Univer 工作区文件为空");
           await replaceFileAtomically(session.sourcePath, contents);
-          await this.clearCheckpoint(session);
-        this.sessions.delete(sessionId);
-          const saved = await stat(session.sourcePath);
-          return { size: saved.size, updatedAt: saved.mtime.toISOString() };
+          return this.finishSavedSession(session,options.keepSession);
         }
         const extension = extname(session.sourcePath);
         const documentBorders = extension.toLowerCase() === ".docx"
@@ -878,12 +908,9 @@ return { applied };`,
           assertOfficeExport(exported, extension);
           await replaceFileAtomically(session.sourcePath, exported);
         } finally {
-          await rm(exportedPath, { force: true });
+          await rm(exportedPath, { force: true }).catch(()=>undefined);
         }
-        await this.clearCheckpoint(session);
-        this.sessions.delete(sessionId);
-        const saved = await stat(session.sourcePath);
-        return { size: saved.size, updatedAt: saved.mtime.toISOString() };
+        return this.finishSavedSession(session,options.keepSession);
       });
     });
   }

@@ -37,7 +37,7 @@ This is an actual local DSH Web capture with demonstration files and an unsent d
 3. Press **Alt+D** and choose **Add selection to conversation** above the input.
 4. Ask: “Read the current sheet and C2:C6, then increase each selected planned-day value by 1. Keep all other cells and styles unchanged.”
 5. After the tool completes, inspect `3, 5, 7, 4, 3` in those cells, and confirm that adjacent tasks, owners and statuses are unchanged.
-6. Inspect the highlighted changes and choose **Accept**, then **Save**. Close and reopen to check persistence. Use **Save as** to retain the original.
+6. Inspect the highlighted changes and choose **Accept** to save immediately without leaving the current view. Close and reopen to check persistence. To retain the original, duplicate the file before editing the copy.
 
 Edits appear in the draft. A chat message claiming success does not replace checking the grid and save state. Formulas, large ranges or non-contiguous selections may need more extensive Office operations.
 
@@ -50,7 +50,7 @@ For a read-only task, ask: “Explain the selected formula and its references. D
 1. Open `.docx` in the Office editor, or choose **Edit** for a supported text file. The screenshot above shows the plain-text editor, not Word.
 2. Select the sentence or paragraph, press **Alt+D** and add the selection to the conversation.
 3. Ask: “Make this passage more concise while preserving facts and proper names. Change only the selected range and keep other paragraphs intact.”
-4. Review the highlighted wording and formatting. **Accept** before saving, **Discard edit**, or continue refining with DSH. With multiple pending edits, accept all or undo the latest edit one at a time.
+4. Review the highlighted wording and formatting. Choose **Accept** to save immediately, **Discard edit**, or continue refining with DSH. With multiple pending edits, accept all or undo the latest edit one at a time.
 
 The context carries the file, exact location and selected content. Repeated wording elsewhere in the file does not have to be changed. If the reference expires or the original content changes, select it again.
 
@@ -65,7 +65,7 @@ Legacy `.doc` is preview-only; convert it to `.docx` first. Text files above 5 M
 1. Open `.pptx`, enter the editor and select the intended slide.
 2. Selecting an object provides its object context. Entering its text box and highlighting characters provides an exact text selection.
 3. Press **Alt+D**, add the selection and ask: “Replace the selected heading with ‘Review before saving’. Preserve the text-box position, font size and all other slides.”
-4. Check the highlighted object, wording, layout and wrapping. Choose **Accept**, then save and reopen the file.
+4. Check the highlighted object, wording, layout and wrapping. Choose **Accept** to save while staying on the current slide. Reopen the file to verify persistence.
 
 Specify whether you want to replace the entire object's text or only the highlighted passage. Cross-paragraph or mixed-style edits need additional care. Legacy `.ppt` is preview-only and must first be converted to `.pptx`.
 

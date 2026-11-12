@@ -1029,8 +1029,8 @@ export async function registerResourceLibraryRoutes(
   });
   app.post('/api/library/items/:id/univer-session/:sessionId/review', async request => {
     const {id,sessionId}=officeSessionParamsSchema.parse(request.params);
-    const {action,expectedId}=z.object({action:z.enum(['accept','reject']),expectedId:z.string().uuid()}).parse(request.body);
-    return univerOffice!.resolveReview(sessionId,id,action,expectedId);
+    const {action,expectedId,save}=z.object({action:z.enum(['accept','reject']),expectedId:z.string().uuid(),save:z.boolean().optional()}).parse(request.body);
+    return univerOffice!.resolveReview(sessionId,id,action,expectedId,{save});
   });
   app.post('/api/library/items/:id/univer-session/:sessionId/images', async (request, reply) => {
     const params = officeSessionParamsSchema.safeParse(request.params);

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtemp,readFile,rm} from 'node:fs/promises'
+import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createRuntime} from '../lib/host.mjs'
@@ -14,6 +14,51 @@ test('review diffs identify exact cell and text locations without writing docume
   assert.deepEqual(spans.map(c=>[c.start,c.end,c.after]),[[3,6,'待审核'],[11,12,'7']])
   const a={sheets:{s:{name:'Sheet',cellData:{1:{1:{v:2,s:{bg:'red'}}}}}}},b=structuredClone(a);b.sheets.s.cellData[1][1].v=3
   const changes=officeChanges(a,b,'book','sheet');assert.equal(changes.count,1);assert.equal(changes.changes[0].range,'B2');assert.equal(changes.changes[0].before,'2');assert.equal(changes.changes[0].after,'3')
+})
+
+test('accept/save retains the live session, supports later reviews, and preserves pending edits on save conflicts',{timeout:90000},async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'moki-accept-save-')),runtime=await createRuntime({dataDir:dir,sourceDb:null})
+  t.after(async()=>{await runtime.close();await rm(dir,{recursive:true,force:true})})
+  const owner='save-review',office=await runtime.office(owner)
+  const {item}=await runtime.api(owner,'POST','/api/library/files',{name:'Accept.xlsx',format:'xlsx',columns:['Value'],rows:[[1]]})
+  const session=await office.open(item.id,item.target,item.name),original=await readFile(item.target)
+  const read="return univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2').getValue()"
+  const write=value=>office.execute(session.sessionId,item.id,`univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2').setValue(${value})`)
+  const first=await office.reviewedEdit(session.sessionId,item.id,()=>write(2))
+  const second=await office.reviewedEdit(session.sessionId,item.id,()=>write(3))
+  await assert.rejects(office.resolveReview(session.sessionId,item.id,'accept',first.review.id,{save:true}),/版本已变化/)
+  assert.deepEqual(await readFile(item.target),original,'stale acceptance cannot save unseen edits')
+  const saved=await office.resolveReview(session.sessionId,item.id,'accept',second.review.id,{save:true})
+  assert.equal(saved.saved,true);assert.equal(saved.entries.length,0);assert.equal(saved.session.viewerUrl,session.viewerUrl)
+  const same=await office.open(item.id,item.target,item.name)
+  assert.equal(same.sessionId,session.sessionId);assert.equal(same.worktreeId,session.worktreeId)
+  assert.equal(same.recoveredDraft,undefined)
+  const accepted=await readFile(item.target);assert.notDeepEqual(accepted,original)
+  const third=await office.reviewedEdit(session.sessionId,item.id,()=>write(4))
+  await office.resolveReview(session.sessionId,item.id,'reject',third.review.id)
+  assert.equal((await office.execute(session.sessionId,item.id,read)).value,3,'later rejection returns to the accepted baseline')
+  assert.deepEqual(await readFile(item.target),accepted)
+  await write(5);await office.save(session.sessionId,item.id)
+  const reopened=await office.open(item.id,item.target,item.name)
+  assert.equal((await office.execute(reopened.sessionId,item.id,read)).value,5,'continued editing saves against the updated source version')
+  const pending=await office.reviewedEdit(reopened.sessionId,item.id,()=>office.execute(reopened.sessionId,item.id,"univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2').setValue(6)"))
+  // Another application replaces the source while this edit awaits review.
+  await writeFile(item.target,original)
+  await assert.rejects(office.resolveReview(reopened.sessionId,item.id,'accept',pending.review.id,{save:true}),/修改|变化/)
+  assert.equal(office.reviewStatus(reopened.sessionId,item.id).entries.at(-1).id,pending.review.id)
+  assert.equal((await office.execute(reopened.sessionId,item.id,read)).value,6)
+  assert.deepEqual(await readFile(item.target),original,'failed save preserves the external file and the pending edit')
+
+  const nativePath=join(dir,'Native.univer');await office.createNativeFile(nativePath,'sheet','Native save')
+  const native=await office.open('native',nativePath,'Native.univer')
+  const change=await office.reviewedEdit(native.sessionId,'native',()=>office.execute(native.sessionId,'native',"univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2').setValue(7)"))
+  await office.resolveReview(native.sessionId,'native','accept',change.review.id,{save:true})
+  const live=await office.open('native',nativePath,'Native.univer')
+  assert.equal(live.worktreeId,native.worktreeId);assert.equal(live.viewerUrl,native.viewerUrl)
+  await office.execute(native.sessionId,'native',"univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2').setValue(8)")
+  await office.save(native.sessionId,'native')
+  const reopenedNative=await office.open('native',nativePath,'Native.univer')
+  assert.equal((await office.execute(reopenedNative.sessionId,'native',read)).value,8,'saving the native workspace must not retire the live worktree before subsequent edits')
 })
 
 test('Office review stack preserves manual baseline, cancels only latest, survives restart and requires acceptance before save',{timeout:180000},async t=>{

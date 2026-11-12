@@ -343,10 +343,15 @@ const injection = `${startMarker}
         bindCommandListener();
 
         const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-        const waitForEditorSync = async () => {
-          finishSlideTextEditing();
-          const active = document.activeElement;
-          if (active instanceof HTMLElement) active.blur();
+        const waitForEditorSync = async (preserveView = false) => {
+          // Review already flushed local input before the AI edit, and blocks
+          // further typing. Accept only needs to await collaboration sync;
+          // blurring the canvas here would reset Word's current text range.
+          if(!preserveView){
+            finishSlideTextEditing();
+            const active = document.activeElement;
+            if (active instanceof HTMLElement) active.blur();
+          }
           // Univer persists canvas edits through a debounced worktree update. Give
           // the debounce a chance to start before accepting an already-visible
           // "synced" badge from the previous revision.
@@ -392,7 +397,7 @@ const injection = `${startMarker}
           const requestId = typeof event.data.requestId === "string" ? event.data.requestId : "";
           if (!requestId) return;
           if (event.data.type === "moki:univer-prepare-save") {
-            const synced = await waitForEditorSync();
+            const synced = await waitForEditorSync(event.data.preserveView === true);
             window.parent.postMessage({ type: "moki:univer-save-ready", requestId, synced }, "*");
             return;
           }
@@ -588,6 +593,28 @@ if (patchedViewerModule.includes(viewerBoot)) {
 } else if (!patchedViewerModule.includes(viewerBootWithBridge)) {
   throw new Error(`Unable to expose the Univer viewer content bridge in ${viewerModuleFile}`);
 }
+// Use the viewer's own mutation gate, but toggle it in place while reviewing.
+// A URL editable=false/true transition recreates the canvas and loses its view.
+const liveReviewGate = "let u=jG(a,s),d=gG(e.unitType,t);";
+const reviewDispose = "dispose:()=>{l.unsubscribe(),o.dispose(),u(),s.dispose(),a.dispose()}";
+if (!patchedViewerModule.includes(liveReviewGate) || !patchedViewerModule.includes(reviewDispose)) {
+  throw new Error("Unable to install the pinned Office live review gate");
+}
+patchedViewerModule = patchedViewerModule.replace(liveReviewGate, `${liveReviewGate}
+let mokiReviewLocked=false;
+const mokiSetReviewLocked=locked=>{mokiReviewLocked=Boolean(locked);document.documentElement.dataset.mokiReviewLocked=String(mokiReviewLocked)};
+window.__mokiSetReviewLocked=mokiSetReviewLocked;
+const mokiReviewCommands=a.__getInjector().get(N),mokiReviewSync=mokiReviewCommands.syncExecuteCommand;
+// Slide navigation is modelled as a mutation upstream. Keep it local during
+// review so browsing neither edits the draft nor invalidates cancellation.
+const mokiReviewNavigate=function(id,params,options){
+  return mokiReviewSync.call(this,id,params,mokiReviewLocked&&id==="slide.mutation.set-active-slide"?{...options,onlyLocal:true}:options);
+};
+mokiReviewCommands.syncExecuteCommand=mokiReviewNavigate;
+const mokiReviewGate=mokiReviewCommands.beforeCommandExecuted((command,options)=>{
+  if(mokiReviewLocked&&command.type===CE.MUTATION&&options?.fromCollab!==true&&options?.onlyLocal!==true)throw new wm("AI edits are awaiting review");
+});
+`).replace(reviewDispose,"dispose:()=>{mokiReviewGate.dispose();if(mokiReviewCommands.syncExecuteCommand===mokiReviewNavigate)mokiReviewCommands.syncExecuteCommand=mokiReviewSync;if(window.__mokiSetReviewLocked===mokiSetReviewLocked)delete window.__mokiSetReviewLocked;l.unsubscribe(),o.dispose(),u(),s.dispose(),a.dispose()}");
 // Slides are presentation artwork: dark editor chrome must not invert their
 // paper, text or explicit fills. Install a color resolver on the slide viewer's
 // own render service before loading the unit so cached thumbnails and the live

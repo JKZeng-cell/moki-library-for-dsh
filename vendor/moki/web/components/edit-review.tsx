@@ -12,19 +12,19 @@ export function reviewLocation(change:ReviewChange) {
   if(change.kind==='slide')return uiText`幻灯片 ${change.page||'—'}`;
   return uiText('文字与格式');
 }
-export function EditReviewBar({entries,busy,onResolve,onLocate}:{entries:ReviewEntry[];busy:boolean;onResolve:(action:'accept'|'reject',id:string)=>void;onLocate:(change:ReviewChange)=>void}) {
+export function EditReviewBar({entries,busy,status,onResolve,onLocate}:{entries:ReviewEntry[];busy:boolean;status?:string;onResolve:(action:'accept'|'reject',id:string)=>void;onLocate:(change:ReviewChange)=>void}) {
   const latest=entries.at(-1);
   if(!latest&&!busy)return null;
   return <section className="moki-edit-review" aria-label={uiText('AI 修改审阅')} aria-busy={busy}>
     <div className="moki-review-line">
-      <span className="moki-review-label" role="status">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Sparkles size={15}/>}<strong>{busy?uiText('AI 修改中…'):uiText`${entries.length} 次修改待确认`}</strong></span>
-      <span className="moki-review-buttons">
+      <span className="moki-review-label" role="status">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Sparkles size={15}/>}<strong>{busy?(status||uiText('AI 修改中…')):uiText`${entries.length} 次修改待确认`}</strong></span>
+      <span className="moki-review-buttons" onMouseDown={event=>event.preventDefault()}>
         <button type="button" disabled={busy||!latest} onClick={()=>latest&&onResolve('reject',latest.id)}><Undo2 size={14}/>{entries.length>1?uiText('取消最新一次'):uiText('取消本次修改')}</button>
         <button type="button" data-primary disabled={busy||!latest} onClick={()=>latest&&onResolve('accept',latest.id)}><Check size={14}/>{entries.length>1?uiText('采纳全部'):uiText('采纳')}</button>
       </span>
     </div>
     {latest&&<details className="moki-review-details">
-      <summary><ChevronDown size={13}/>{uiText('查看改动')}<span>{uiText('采纳后可手动编辑和保存；可继续让 DSH 修改。')}</span></summary>
+      <summary><ChevronDown size={13}/>{uiText('查看改动')}<span>{uiText('采纳后保存到原文件，保持当前页面；可继续编辑。')}</span></summary>
       <div className="moki-review-history">{entries.slice().reverse().map(entry=><section key={entry.id}>
         <header>{uiText`第 ${entry.sequence} 次修改`} · {uiText`${entry.count??entry.changes.length} 处改动`}</header>
         {entry.changes.slice(0,30).map((change,index)=><div className="moki-review-change" key={index}>

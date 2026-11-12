@@ -6,6 +6,7 @@ import { SpreadsheetPreview } from "./spreadsheet-preview.js";
 import {ExtraFilePreview,useFilePreviewInfo} from './resource-extra-preview.js';
 import {readPreviewSelection,previewLocation,selectionLabel,capturePreviewVisual,type PreviewSelection,type VisualSnapshot} from './resource-preview-selection.js';
 import {PreviewRegionSelection} from './resource-region-selection.js';
+import {SelectionChatAction} from './selection-chat-action.js';
 import { Button, IconButton } from "./ui-controls.js";
 import "./resource-preview-header.css";
 import { apiFetch, panelUrl } from "../lib/api-fetch.js";
@@ -1177,7 +1178,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     const style = getComputedStyle(root);
     const tokens = {surface:"bg-base",toolbar:"bg-layer-1",border:"border-l2",label:"label-primary",popover:"button-floating-fill",hover:"interactive-bg-hover"};
     const colors = Object.fromEntries(Object.entries(tokens).map(([key,token])=>[key,style.getPropertyValue("--dsw-alias-"+token).trim()]));
-    frame.contentWindow.postMessage({type:"moki:univer-theme",dark:root.dataset.colorScheme === "dark",colors}, new URL(frame.src).origin);
+    frame.contentWindow.postMessage({type:"moki:univer-theme",dark:root.dataset.colorScheme === "dark",colors,locale:root.lang}, new URL(frame.src).origin);
   }
   const officeViewerUrl = useMemo(() => {
     if (!univerSession?.viewerUrl) return undefined;
@@ -1501,6 +1502,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     selectedText = "",
     anchor?: { x: number; y: number },
     editorSelection?: UniverImageSelection,
+    quoteSelection=false,
   ) {
     let detail=readPreviewSelection(previewContent(),undefined,editingText?textContent:undefined)??selectedPreview.current;
     if(editorSelection){
@@ -1512,7 +1514,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     }
     mokiAssistancePendingRef.current=true;mokiEditorAssistantOpenedRef.current=true;
     const context=publishPreviewSelection(selectedPreview.current);
-    requestMokiAssistance(context,instruction.trim(),{...(anchor?{anchor}:{}),preferInline:true,prefillPrompt:false,editorAssist:true});
+    requestMokiAssistance(context,instruction.trim(),{...(anchor?{anchor}:{}),preferInline:true,prefillPrompt:false,editorAssist:true,quoteSelection});
   }
 
   function finishMokiEditorAssistance() {
@@ -1564,7 +1566,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       askMokiToEdit("", selectedText, {
         x: Math.round(bounds.left + Math.max(0, Math.min(bounds.width, localX))),
         y: Math.round(bounds.top + Math.max(0, Math.min(bounds.height, localY))),
-      }, editorSelection);
+      }, editorSelection, detail.quoteSelection===true);
     };
     window.addEventListener("message", handleEditorMessage);
     return () => window.removeEventListener("message", handleEditorMessage);
@@ -1797,6 +1799,10 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
         maxHeight: embedded ? undefined : contained ? "calc(100% - 2rem)" : undefined,
       }}
     >
+      <SelectionChatAction root={previewWindowRef} active={active&&!editingOffice&&!exitIntent&&!libraryImagePickerOpen} sourceText={editingText?textContent:undefined} onQuote={(selected,anchor)=>{
+        selectedPreview.current=selected;mokiAssistancePendingRef.current=true;mokiEditorAssistantOpenedRef.current=true;
+        requestMokiAssistance(publishPreviewSelection(selected),'',{anchor,preferInline:true,prefillPrompt:false,editorAssist:true,quoteSelection:true});
+      }}/>
       <header className="resource-preview-header dsh-file-bar">
         <div className="dsh-file-summary">
           <details ref={detailRef} className="dsh-file-details" onKeyDown={event => {

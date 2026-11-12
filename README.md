@@ -55,9 +55,9 @@ Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.
 Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
 
 Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
-Version: 0.1.62
-Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.62/dsh-moki-library-0.1.62.tgz
-SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.62/SHA256SUMS.txt
+Version: 0.1.63
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.63/dsh-moki-library-0.1.63.tgz
+SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.63/SHA256SUMS.txt
 
 Follow these steps:
 1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
@@ -67,7 +67,7 @@ Follow these steps:
    dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
 5. Check the installed version:
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   Confirm that desktop lists version 0.1.62 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+   Confirm that desktop lists version 0.1.63 (or the newer version retained above). Preserve existing plugins, configuration and library data.
 6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
 
 If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
@@ -81,12 +81,12 @@ If this conversation cannot download files or execute a terminal, the environmen
 
 ### Option 2: Install manually in a terminal
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.62.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.62).
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.63.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.63).
 2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.62.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.63.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -108,8 +108,10 @@ The GitHub source archive is for development; the `.tgz` release asset is the bu
 1. Open **MOKI Library** from DSH's sidebar. Use **Add files** or drag files, folders and links into the content area.
 2. Organize virtual folders and tags. Search by name, tag or path, clear the search with one click, and switch between list/card views. Hover over a thumbnail for a larger preview.
 3. Open a file. By default, the main library uses separate preview windows and the side workspace opens new tabs. Settings can explicitly choose DSH's main window, a separate window or the default app.
-4. For editable formats, enter **Edit**, select the relevant content, press **Alt+D** and choose **Add selection to conversation**. Describe the task.
+4. Select text in preview or edit mode and click the **whale beside the selection**. DSH opens with the selection reference already in the input. Describe the task. **Alt+D** and **Add selection to conversation** remain available.
 5. Review the highlighted AI edits, then choose **Accept** or **Discard edit**. After accepting, **Save** or **Save as** and reopen the file to check persistence.
+
+Text previews, PDF text, the text editor and Office editors support quick selection chat, including file and precise location references. Mouse and keyboard selection work in side workspace tabs and separate preview windows. Quoting preserves your existing draft and never sends it automatically. Use visual region selection for scanned PDFs; selections in the default external application remain managed by that application.
 
 ### Review before saving
 

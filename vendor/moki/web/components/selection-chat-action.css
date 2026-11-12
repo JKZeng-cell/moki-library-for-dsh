@@ -1,0 +1,2 @@
+.moki-selection-chat-action{position:fixed;z-index:90;display:grid;place-items:center;width:32px;height:30px;padding:0;border:1px solid var(--moki-control-border,var(--moki-border));border-radius:8px;background:var(--moki-surface);color:var(--moki-text);box-shadow:0 3px 12px #0003;cursor:pointer;user-select:none;touch-action:manipulation}
+.moki-selection-chat-action:hover{background:var(--moki-surface-hover);color:var(--dsw-alias-link,var(--moki-text))}.moki-selection-chat-action:focus-visible{outline:2px solid var(--dsw-alias-link,#7198f7);outline-offset:2px}

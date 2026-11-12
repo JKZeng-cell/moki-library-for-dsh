@@ -11,18 +11,20 @@ export function PreviewChat({origin,action}:Props) {
   const [connected,setConnected]=useState(false)
   const [status,setStatus]=useState({title:uiText("DSH 对话"),creating:false,history:false})
   const ready=useRef(false),open=useRef(false),selection=useRef<unknown>(null)
+  const quoteRequest=useRef<{id:string;selection:unknown}|null>(null)
   const returnFocus=useRef<HTMLElement|null>(null),timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined)
   const sequence=useRef(0)
   const send=useCallback((command:string,data:object={})=>{
     if(origin)iframe.current?.contentWindow?.postMessage({channel:'moki-preview-chat',action:command,...data},origin)
   },[origin])
   const close=useCallback(()=>{
-    open.current=false;sequence.current++;clearTimeout(timer.current);show(false)
+    send('cancel-quote')
+    open.current=false;quoteRequest.current=null;sequence.current++;clearTimeout(timer.current);show(false)
     void action('hide-chat').catch(()=>{})
     const editor=returnFocus.current?.isConnected && returnFocus.current!==document.body ? returnFocus.current :
       document.querySelector<HTMLElement>('.dsh-file-view textarea,.dsh-file-view iframe,.dsh-file-view [data-dsh-chat-trigger]')
     editor?.focus({preventScroll:true})
-  },[action])
+  },[action,send])
   const connect=useCallback((retry=false)=>{
     const current=++sequence.current
     if(!open.current)returnFocus.current=document.activeElement instanceof HTMLElement?document.activeElement:null
@@ -33,11 +35,16 @@ export function PreviewChat({origin,action}:Props) {
     if(!ready.current)timer.current=setTimeout(()=>{if(current===sequence.current && !ready.current)setError(uiText("连接 DSH 超时，请重试。"))},24000)
     void action('compose').then(()=>{
       if(current!==sequence.current || !ready.current)return
-      send('selection',{selection:selection.current});send('focus')
+      send('selection',{selection:selection.current});if(quoteRequest.current)send('quote',{request:quoteRequest.current});send('focus')
     }).catch(e=>{if(current===sequence.current){clearTimeout(timer.current);setError(e.message)}})
   },[action,send])
   useEffect(()=>{
-    const invoke=(event:Event)=>{selection.current=(event as CustomEvent).detail;connect()}
+    const invoke=(event:Event)=>{
+      const detail=(event as CustomEvent).detail
+      selection.current=detail?.selection
+      quoteRequest.current=detail?.quoteSelection?{id:crypto.randomUUID(),selection:detail.selection}:null
+      connect()
+    }
     const selected=(event:Event)=>{
       selection.current=(event as CustomEvent).detail
       if(open.current && ready.current)send('selection',{selection:selection.current})
@@ -48,8 +55,9 @@ export function PreviewChat({origin,action}:Props) {
       const data=event.data
       if(data.action==='ready'){
         ready.current=true;clearTimeout(timer.current);setConnected(true);setError('')
-        send('selection',{selection:selection.current});if(open.current)send('focus')
+        send('selection',{selection:selection.current});if(open.current){if(quoteRequest.current)send('quote',{request:quoteRequest.current});send('focus')}
       }
+      if(data.action==='quote-result' && data.id===quoteRequest.current?.id){quoteRequest.current=null;if(!data.added)setError(uiText('当前对话输入框暂时无法接收选区'))}
       if(data.action==='state')setStatus({title:String(data.title),creating:Boolean(data.creating),history:Boolean(data.history)})
       if(data.action==='close' && open.current)close()
       if(data.action==='activate')activate()

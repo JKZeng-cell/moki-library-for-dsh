@@ -14,6 +14,7 @@ export type MokiAssistantComposeRequest = {
   anchor?: { x: number; y: number };
   emptyComposer?: boolean;
   editorAssist?: boolean;
+  quoteSelection?: boolean;
 };
 
 export type WorkbenchSelectionContext = {
@@ -323,6 +324,7 @@ export function readPendingMokiAssistantComposeRequest(options: { consume?: bool
         : {}),
       ...(parsed.emptyComposer === true ? { emptyComposer: true } : {}),
       ...(parsed.editorAssist === true ? { editorAssist: true } : {}),
+      ...(parsed.quoteSelection === true ? { quoteSelection: true } : {}),
     };
   } catch {
     return undefined;
@@ -332,7 +334,7 @@ export function readPendingMokiAssistantComposeRequest(options: { consume?: bool
 export function requestMokiAssistance(
   selection: Omit<WorkbenchSelectionContext, "capturedAt">,
   prompt: string,
-  options: { anchor?: { x: number; y: number }; preferInline?: boolean; prefillPrompt?: boolean; editorAssist?: boolean } = {},
+  options: { anchor?: { x: number; y: number }; preferInline?: boolean; prefillPrompt?: boolean; editorAssist?: boolean; quoteSelection?: boolean } = {},
 ): void {
   publishWorkbenchSelectionContext(selection);
   requestMokiAssistantPrompt(prompt, options);
@@ -340,7 +342,7 @@ export function requestMokiAssistance(
 
 export function requestMokiAssistantPrompt(
   prompt: string,
-  options: { anchor?: { x: number; y: number }; preferInline?: boolean; prefillPrompt?: boolean; editorAssist?: boolean } = {},
+  options: { anchor?: { x: number; y: number }; preferInline?: boolean; prefillPrompt?: boolean; editorAssist?: boolean; quoteSelection?: boolean } = {},
 ): void {
   const emptyComposer = options.prefillPrompt === false;
   const request: MokiAssistantComposeRequest = {
@@ -349,6 +351,7 @@ export function requestMokiAssistantPrompt(
     ...(options.anchor ? { anchor: options.anchor } : {}),
     ...(emptyComposer ? { emptyComposer: true } : {}),
     ...(options.editorAssist === true ? { editorAssist: true } : {}),
+    ...(options.quoteSelection === true ? { quoteSelection: true } : {}),
   };
   try {
     window.sessionStorage.setItem(MOKI_ASSISTANT_COMPOSE_STORAGE_KEY, JSON.stringify(request));

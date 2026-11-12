@@ -2,7 +2,10 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import {installOfficeReview} from './office-review-viewer.js';
+import {installOfficeSelectionAction} from './office-selection-action.js';
+import selectionWhale from '../web/dsh-whale.svg';
 export const officeReviewSource=installOfficeReview.toString();
+export const officeSelectionSource=installOfficeSelectionAction.toString()+JSON.stringify(selectionWhale);
 
 export async function patchViewer(artifacts) {
 const viewerPath = join(artifacts,"viewer/index.html");
@@ -264,6 +267,7 @@ const injection = `${startMarker}
           return true;
         };
         document.addEventListener("pointerdown", (event) => {
+          if(event.target?.closest?.('[data-selection-chat-action]'))return;
           retainedSlideTextSelection = null;
           pointer = { x: event.clientX, y: event.clientY };
           rememberUserEditIntent();
@@ -369,11 +373,13 @@ const injection = `${startMarker}
           }
           return false;
         };
+        (${installOfficeSelectionAction.toString()})({readSelection:activeEditorSelection,findService:findEditorService,prepare:async()=>{if(finishSlideTextEditing())await waitForEditorSync()},whale:${JSON.stringify(selectionWhale)}});
         window.addEventListener("message", async (event) => {
           if (event.source !== window.parent || !event.data) return;
           if (event.data.type === "moki:univer-theme" && typeof event.data.dark === "boolean") {
             requestedScheme = event.data.dark;
             const root = document.documentElement;
+            if(typeof event.data.locale==='string')root.lang=event.data.locale;
             root.dataset.dshTheme = requestedScheme ? "dark" : "light";
             root.style.setProperty("--moki-scheme",root.dataset.dshTheme);
             for (const name of ["surface","toolbar","border","label","popover","hover"]) {

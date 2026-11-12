@@ -1,4 +1,5 @@
 import { l as uiText, useLibraryLocale } from './i18n.js';
+import {insertSelectionQuote} from './selection-quote.js';
 // This seat runs in the official DSH web client at DSH's own origin.
 // The document in the parent can request UI actions, never DSH RPCs.
 export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBinding,quote,QuoteContext,css,createPortal}) {
@@ -17,6 +18,8 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
     useLibraryLocale(React)
     const [info,setInfo]=React.useState(null),[target,choose]=React.useState(null),[error,setError]=React.useState('')
     const [selection,setSelection]=React.useState(null)
+    const [quoteRequest,setQuoteRequest]=React.useState(null)
+    const quoteTarget=React.useRef(null),handledQuote=React.useRef(null)
     const parentOrigin=React.useRef(null),anchor=React.useRef(null)
     React.useLayoutEffect(()=>{
       const shell=anchor.current?.closest('#root > *')
@@ -32,12 +35,19 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
       context().then(value=>{
         if(!live)return
         parentOrigin.current=value.parentOrigin
-        setSelection(value.selection);choose(value.sessionId);setInfo(value)
+        setSelection(value.selection);choose(value.sessionId);quoteTarget.current=value.sessionId;setInfo(value)
         post('ready')
       }).catch(e=>{if(live)setError(e.message)})
       const receive=event=>{
         if(event.source!==parent || event.origin!==parentOrigin.current || event.data?.channel!==channel)return
         if(event.data.action==='selection')setSelection(event.data.selection)
+        else if(event.data.action==='cancel-quote')setQuoteRequest(null)
+        else if(event.data.action==='quote'){
+          const request=event.data.request
+          if(!request?.id || !request.selection)return
+          if(handledQuote.current?.id===request.id){post('quote-result',handledQuote.current);return}
+          setQuoteRequest({...request,target:quoteTarget.current})
+        }
         else if(['focus','new','history'].includes(event.data.action))window.dispatchEvent(new CustomEvent('moki:preview-chat-command',{detail:event.data.action}))
       }
       const activate=()=>post('activate')
@@ -50,10 +60,18 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
     // Only retain an identity after this client knows it.
     const preferred=target || current.key
     const selected=catalog.byId[preferred] ? preferred : null
+    quoteTarget.current=selected||target
     const resolving=catalog.phase==='pending' && !selected
     const chat=useChatBinding(ctx,binding,key,selected,Boolean(info))
     const session=useSource(chat.reference?ctx.uiSession.adapter.bindingSource(chat.reference):empty)
     const input=useSource(session?.hooks.input || empty),actions=session?.props.inputActions
+    React.useEffect(()=>{
+      if(!quoteRequest||handledQuote.current?.id===quoteRequest.id||!selected||!chat.reference)return
+      const result=quoteRequest.target&&quoteRequest.target!==selected?{added:false}:insertSelectionQuote(quoteRequest,input,actions,quote)
+      if(!result)return
+      handledQuote.current={id:quoteRequest.id,...result};setQuoteRequest(null);post('quote-result',handledQuote.current)
+      if(result.added)window.dispatchEvent(new CustomEvent('moki:preview-chat-command',{detail:'focus'}))
+    },[quoteRequest,selected,chat.reference,input,actions,post])
     const quoted=React.useMemo(()=>quote(selection),[selection])
     const added=Boolean(quoted && String(input?.draft||'').replace(/^> ?/gm,'').includes(quoted))
     const quoteProps={sessionId:selected,selection,added,disabled:!actions || input?.phase!=='plain' || added,

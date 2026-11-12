@@ -254,7 +254,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
           if (entry.state.selection?.content !== message.selection?.content || entry.state.selection?.label !== message.selection?.label) update(entry,{selection:message.selection})
           break
         case 'location': entry.itemId = message.itemId; if (entry.state.previewing !== message.previewing) update(entry,{previewing:message.previewing}); break
-        case 'compose': if (entry.host) update(entry,{chat:true,selection:message.selection}); break
+        case 'compose': if (entry.host) update(entry,{chat:true,selection:message.selection,...(message.quoteSelection?{quoteRequest:{id:crypto.randomUUID(),selection:message.selection,target:entry.state.chatTarget||entry.chatSession||null}}:{})}); break
         case 'exit': update(entry,{chat:false}); break
         case 'error': update(entry,{notice:message.message}); break
       }

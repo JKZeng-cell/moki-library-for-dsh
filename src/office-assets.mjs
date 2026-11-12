@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { patchViewer,officeReviewSource } from './office-viewer-patch.mjs'
+import { patchViewer,officeReviewSource,officeSelectionSource } from './office-viewer-patch.mjs'
 
-const digest=createHash('sha256').update(patchViewer.toString()).update(officeReviewSource).update(import.meta.resolve('dsh-univer-office')).digest('hex').slice(0,16)
+const digest=createHash('sha256').update(patchViewer.toString()).update(officeReviewSource).update(officeSelectionSource).update(import.meta.resolve('dsh-univer-office')).digest('hex').slice(0,16)
 const cache=join(process.env.DSH_HOME||join(homedir(),'.dsh'),'moki-library','runtime')
 export const officeAssets=join(cache,'univer-0.2.10-'+digest)
 let preparing

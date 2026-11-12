@@ -1,4 +1,5 @@
 import { l as uiText, useLibraryLocale } from './i18n.js';
+import {insertSelectionQuote} from './selection-quote.js';
 export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBinding, quote, publish, views, pool, css, kind, type, t, ui,SettingsButton}) {
   const h = React.createElement
   const panelId = 'moki-library'
@@ -119,13 +120,23 @@ export function registerPanels(ctx, React, {Icon, Chat, Conversation, useChatBin
         pool.update(entry,{notice:uiText("已加入当前 DSH 对话草稿")})
       } else pool.update(entry,{notice:uiText("当前对话输入框暂时无法接收选区")})
     },[actions,disabled,quoted,entry])
+    const handledQuote=React.useRef(null)
+    React.useEffect(()=>{
+      const request=state.quoteRequest
+      if(!request||handledQuote.current===request.id||!visible||!state.chat||!chat.reference||!target)return
+      if(request.target&&request.target!==target){handledQuote.current=request.id;pool.update(entry,{quoteRequest:null});return}
+      const result=insertSelectionQuote(request,input,actions,quote)
+      if(!result)return
+      handledQuote.current=request.id
+      pool.update(entry,{quoteRequest:null,notice:result.added?'':uiText('当前对话输入框暂时无法接收选区')})
+    },[state.quoteRequest,visible,state.chat,chat.reference,target,input,actions,entry])
     React.useEffect(()=>{
       if (!visible || !target) return
       publish(target,{owner:entry,selection,add,added,disabled})
       return ()=>{if(views.get(target)?.owner === entry) publish(target,null)}
     },[visible,target,entry,selection,add,added,disabled])
     const closeChat=()=>{
-      pool.update(entry,{chat:false});entry.frame.focus();pool.send(entry,'focus-editor')
+      pool.update(entry,{chat:false,quoteRequest:null});entry.frame.focus();pool.send(entry,'focus-editor')
     }
     const main=mode==='main'
     const switchLabel=main?uiText("在侧边工作区打开"):uiText("在主窗口打开")

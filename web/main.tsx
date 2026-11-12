@@ -62,15 +62,16 @@ window.addEventListener('moki:preview-snapshot',event=>{
   imagePending=post('selection-image',(event as CustomEvent).detail).catch(error=>{documentError(error);throw error})
   void imagePending.catch(()=>undefined)
 })
-async function compose(){
+async function compose(event?:Event){
   if(!active && !standalone)return
+  const requested=selection,quoteSelection=Boolean((event as CustomEvent|undefined)?.detail?.quoteSelection)
   try{await imagePending}catch{return}
   if(standalone){
-    window.dispatchEvent(new CustomEvent('moki:preview-compose',{detail:selection}))
+    window.dispatchEvent(new CustomEvent('moki:preview-compose',{detail:{selection:requested,quoteSelection}}))
     return
   }
   await publish(true)
-  send('compose',{selection})
+  send('compose',{selection:requested,quoteSelection})
 }
 window.addEventListener(MOKI_ASSISTANT_COMPOSE_EVENT,compose)
 window.addEventListener('keydown',event=>{

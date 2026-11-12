@@ -33,7 +33,7 @@ if(!windowIcon)throw new Error('The preview must ship a multi-resolution taskbar
 // gateway must stay inside this bundle or they shadow the desktop's own services.
 const runtimePackages=Object.keys(manifest.dependencies).filter(name=>name!=='dsh-univer-office')
 const host=await bundle({metafile:true,entryPoints:[resolve(root,'src/host.mjs')],outfile:resolve(root,'lib/host.mjs'),
-  bundle:true,external:runtimePackages,plugins:[officeAdapter],platform:'node',target:'node22',format:'esm',
+  bundle:true,external:runtimePackages,plugins:[officeAdapter],platform:'node',target:'node22',format:'esm',loader:{'.svg':'text'},
   define:{__MOKI_WINDOW_ICON__:JSON.stringify('../app/'+windowIcon.fileName)},
   banner:{js:"import {createRequire as createHostRequire} from 'node:module'; const require=createHostRequire(import.meta.url);"}})
 await mkdir(resolve(root,'.dev'),{recursive:true})

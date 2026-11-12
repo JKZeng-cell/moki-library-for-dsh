@@ -486,7 +486,6 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const [officeReviews,setOfficeReviews]=useState<ReviewEntry[]>([]);
   const [officeReviewHighlights,setOfficeReviewHighlights]=useState<ReviewChange[]>([]);
   const [reviewPreparing,setReviewPreparing]=useState(false);
-  const [officeReviewLocked,setOfficeReviewLocked]=useState(false);
   const [reviewRemoteBusy,setReviewRemoteBusy]=useState(false);
   const [reviewResolving,setReviewResolving]=useState(false);
   const pendingReviews=textReviews.length+officeReviews.length;
@@ -679,7 +678,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       } else {
         const session=univerSessionRef.current;if(!session)return;
         await draftRequest(`univer-session/${session.sessionId}/review`,'POST',{action,expectedId});
-        await refreshOfficeReview();setOfficeReviewLocked(false);
+        await refreshOfficeReview();
       }
       setNotice(action==='accept'?uiText('已采纳 AI 修改，可继续编辑或保存'):uiText('已取消最新一次 AI 修改，之前的内容已保留'));
     } catch(error) {setNotice(error instanceof Error?error.message:String(error));}
@@ -764,7 +763,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     setCompatibleMedia(false);
     setTextContent("");
     setTextHistory({undo:[],redo:[]});
-    setTextReviews([]);setOfficeReviews([]);setOfficeReviewHighlights([]);officeReviewStamp.current='';setOfficeReviewLocked(false);setReviewPreparing(false);setReviewRemoteBusy(false);
+    setTextReviews([]);setOfficeReviews([]);setOfficeReviewHighlights([]);officeReviewStamp.current='';setReviewPreparing(false);setReviewRemoteBusy(false);
     setSavedTextContent("");
     setTextSourceVersion(undefined);
     setEditingText(false);
@@ -1094,7 +1093,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       await discardOfficeSession(session);
       univerSessionRef.current = undefined;
       setUniverSession(undefined);
-      setOfficeReviews([]);setOfficeReviewLocked(false);
+      setOfficeReviews([]);
       setStructuredPreview(savedStructuredPreview ? structuredClone(savedStructuredPreview) : undefined);
       setEditingOffice(false);
       finishMokiEditorAssistance();
@@ -1184,9 +1183,12 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     if (!univerSession?.viewerUrl) return undefined;
     const url = new URL(univerSession.viewerUrl, window.location.href);
     url.searchParams.set("lang", intlLocale());
-    if(officeReviews.length||officeReviewLocked)url.searchParams.set('editable','false');
+    // Progress is protected by the review shield. Changing the URL for every
+    // prepare/refresh pair reloads the entire editor, even for read-only calls.
+    // Only a real, pending edit needs the persistent read-only review surface.
+    if(officeReviews.length)url.searchParams.set('editable','false');
     return url.href;
-  }, [univerSession?.viewerUrl,Boolean(officeReviews.length||officeReviewLocked)]);
+  }, [univerSession?.viewerUrl,Boolean(officeReviews.length)]);
   useEffect(() => {
     if (!univerSession?.viewerUrl) return;
     const observer = new MutationObserver(syncOfficeTheme);
@@ -1297,7 +1299,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       const result = await saveAsResourceLibraryUniverSession(item.id, session.sessionId, item.name, destination ?? undefined);
       univerSessionRef.current = undefined;
       setUniverSession(undefined);
-      setOfficeReviews([]);setOfficeReviewLocked(false);
+      setOfficeReviews([]);
       setStructuredPreview(savedStructuredPreview ? structuredClone(savedStructuredPreview) : undefined);
       setEditingOffice(false);
       finishMokiEditorAssistance();
@@ -1396,9 +1398,9 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       if(command.phase==='prepare') {
         if(reviewResolving||saving)throw new Error(uiText('正在确认或保存修改，请稍后重试'));
         flushSync(()=>setReviewPreparing(true));
-        try {if(univerSessionRef.current)await prepareOfficeEditorSave(univerSessionRef.current);setOfficeReviewLocked(true);}
+        try {if(univerSessionRef.current)await prepareOfficeEditorSave(univerSessionRef.current);}
         catch(error){setReviewPreparing(false);throw error;}
-      } else {await refreshOfficeReview();setReviewPreparing(false);setOfficeReviewLocked(false);}
+      } else {await refreshOfficeReview();setReviewPreparing(false);}
       return {status:'completed',message:'Review state synchronized'};
     }
     if((pendingReviews||reviewBusy)&&['save','save_as','discard','undo','redo'].includes(command.operation))throw new Error(uiText('请先在审阅栏采纳或取消 AI 修改'));
@@ -1893,6 +1895,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
           <iframe
             ref={officeEditorFrameRef}
             data-office-editor="true"
+            inert={reviewBusy || undefined}
             src={officeViewerUrl}
             title={uiText`${item.name} Univer Office 编辑器`}
             allow="clipboard-read; clipboard-write"

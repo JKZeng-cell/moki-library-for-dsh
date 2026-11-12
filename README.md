@@ -55,9 +55,9 @@ Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.
 Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
 
 Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
-Version: 0.1.66
-Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.66/dsh-moki-library-0.1.66.tgz
-SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.66/SHA256SUMS.txt
+Version: 0.1.67
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.67/dsh-moki-library-0.1.67.tgz
+SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.67/SHA256SUMS.txt
 
 Follow these steps:
 1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
@@ -67,7 +67,7 @@ Follow these steps:
    dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
 5. Check the installed version:
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   Confirm that desktop lists version 0.1.66 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+   Confirm that desktop lists version 0.1.67 (or the newer version retained above). Preserve existing plugins, configuration and library data.
 6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
 
 If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
@@ -81,12 +81,12 @@ If this conversation cannot download files or execute a terminal, the environmen
 
 ### Option 2: Install manually in a terminal
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.66.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.66).
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.67.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.67).
 2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.66.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.67.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -108,10 +108,10 @@ The GitHub source archive is for development; the `.tgz` release asset is the bu
 1. Open **MOKI Library** from DSH's sidebar. Use **Add files** or drag files, folders and links into the content area.
 2. Organize virtual folders and tags. Search by name, tag or path, clear the search with one click, and switch between list/card views. Hover over a thumbnail for a larger preview.
 3. Open a file. By default, the main library uses separate preview windows and the side workspace opens new tabs. Settings can explicitly choose DSH's main window, a separate window or the default app.
-4. Select text in preview or edit mode and click the **whale beside the selection**. The selection reference is added to the input, ready for your request. **The side workspace focuses the current main conversation; main-window and standalone previews open a floating DSH conversation.** **Alt+D** and **Add selection to conversation** remain available. The whale also appears at Word/PPT text insertion positions, empty Excel cells and text-editor carets. Clicking an empty PDF page area quotes its page and page-relative position. Empty positions never reuse previously selected text.
+4. Select text in preview or edit mode and click the **whale beside the selection**. A compact input opens beside the selection with its content and location already attached. Type an instruction, optionally choose, drop or paste files, then press **Send** (Enter; Shift+Enter for a new line). **After sending, the side workspace focuses the current main conversation; main-window and standalone previews open a floating DSH conversation.** **Alt+D** and **Add selection to conversation** remain available. The whale also appears at Word/PPT text insertion positions, empty Excel cells and text-editor carets. Clicking an empty PDF page area quotes its page and page-relative position. Empty positions never reuse previously selected text.
 5. Review the highlighted AI edits, then choose **Accept** or **Discard edit**. After accepting, **Save** or **Save as** and reopen the file to check persistence.
 
-Text previews, PDF text, the text editor and Office editors support quick selection chat, including file and precise location references. Mouse and keyboard selection work in side workspace tabs and separate preview windows. Quoting preserves your existing draft and never sends it automatically. Use visual region selection for scanned PDFs; selections in the default external application remain managed by that application.
+Text previews, PDF text, the text editor and Office editors support quick selection chat, including file and precise location references. Mouse and keyboard selection work in side workspace tabs and separate preview windows. Opening the quick input never sends a message. Its Send button submits only the captured selection, your instruction and its attachments; existing DSH draft text and attachments stay intact. Failed sends retain the quick input for retry. Files use DSH’s native attachment pipeline (32 MB per file). Use visual region selection for scanned PDFs; selections in the default external application remain managed by that application.
 
 ### Review before saving
 
@@ -139,7 +139,7 @@ The [illustrated usage demos](docs/usage-demos.md) include exact steps, sample p
 
 **Add selection to conversation** carries selected content and its location. **Library → Add attachments** supplies selected files, after enabling the library composer button in settings. Separately, **automatic task-file mapping** collects newly created/delivered DSH files in “DSH task files” after it is enabled, deduplicating identical paths.
 
-In the side workspace, the whale, DSH conversation button and Alt+D focus the current main conversation so the file stays beside the chat. Main-window and standalone previews use a floating conversation with DSH's native input, moving/resizing and session creation/switching. A standalone preview keeps its conversation inside that window. Moving back to the side workspace routes quotes to the current main session instead of a previously selected floating history session.
+The whale opens the same compact selection input as MOKI Canvas. After sending in the side workspace, the current main conversation receives focus so the file stays beside the chat. The DSH conversation button and Alt+D still open the conversation directly. Main-window and standalone previews use a floating conversation with DSH's native input, moving/resizing and session creation/switching. A standalone preview keeps its conversation inside that window. Moving back to the side workspace routes quotes to the current main session instead of a previously selected floating history session.
 
 Default context text is bounded to 4,000 characters; composer quotes to 1,000. Truncation is marked. Tools can request more content when needed. Selection references are scoped to the conversation/editor, expire after ten minutes, and reject stale or reused edits.
 

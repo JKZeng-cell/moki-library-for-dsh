@@ -25,13 +25,20 @@ function binding(id){
   return value
 }
 const current=source(binding('current')),panel=source({activePanelId:null}),slots=new Map(),cleanup=[]
+const sent=[],drafts=new Map(),quickState={pauseUploads:false,fail:false,released:0,created:0}
 const tab={id:'file-tab',contentId:'dsh-resource://moki-library/'+window.qaItemId,visible:true,signal:new AbortController().signal}
 const ctx={
   effect(fn){const dispose=fn();if(typeof dispose==='function')cleanup.push(dispose)},
   slots:{inject(name,fn){fn()},register(spec,component){slots.set(spec.name+':'+spec.key,component);return()=>{}}},
   layout:{panelInfo:panel,selectPanel(id){panel.set({activePanelId:id})}},
   uiSession:{adapter:{current,bindingSource:reference=>source(binding(reference.id))}},
-  sessions:{retain(id){return{id,ready:Promise.resolve(),release(){}}}},
+  sessions:{retain(id){return{id,ready:Promise.resolve(),binding:{session:{sessionId:id,getSnapshot:()=>({subagent:null})}},release(){}}}},
+  conversation:{
+    createDrafts(id,files){quickState.created+=files.length;return files.map(file=>{const draft={id:crypto.randomUUID(),kind:'file',file};drafts.set(draft.id,draft);return draft})},
+    fileUploads:{getSnapshot:()=>Object.fromEntries([...drafts.keys()].map(id=>[id,{status:quickState.pauseUploads?'uploading':'ready'}]))},
+    releaseDraftAttachments(items){quickState.released+=items.length;items.forEach(item=>drafts.delete(item.id))},
+    async sendSession(session,text,ids){if(quickState.fail)throw new Error('Test send failed');sent.push({sessionId:session.sessionId,text,files:await Promise.all(ids.map(async id=>({name:drafts.get(id).file.name,text:await drafts.get(id).file.text()})))});return {kind:'success'}}
+  },
   sidebarRight:{openResource(){},closeIn(){},openTab(){}},sidebarRightTabs:{register(){return()=>{}}},
   uiWorkspace:{startSession(){current.set(binding('current'))}},
 }
@@ -58,4 +65,4 @@ function App(){
     h('aside',{hidden:Boolean(active)},h(Side,{...seat,sessionId:'current',useTabInfo:()=>({tab})})))
 }
 createRoot(document.getElementById('root')).render(h(App))
-window.qa={pool,binding,current,entry:()=>pool.entryFor('moki-document-'+window.qaItemId,window.qaItemId)}
+window.qa={pool,binding,current,sent,quickState,entry:()=>pool.entryFor('moki-document-'+window.qaItemId,window.qaItemId)}

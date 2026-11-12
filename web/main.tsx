@@ -6,6 +6,7 @@ import { PageStateProvider } from '../vendor/moki/web/lib/page-state'
 import { apiFetch } from '../vendor/moki/web/lib/api-fetch'
 import { collectDragFiles,warmNativeFileDrag } from '../vendor/moki/web/lib/library-drag'
 import {DocumentPreview} from './document-preview'
+import {SelectionComposer,type QuickSubmission} from './selection-composer'
 import { WORKBENCH_SELECTION_EVENT, MOKI_ASSISTANT_COMPOSE_EVENT, MOKI_ASSISTANT_EDITOR_EXIT_EVENT } from '../vendor/moki/web/lib/workbench-selection-context'
 import './base.css'
 import '../vendor/moki/web/ui-foundations.css'
@@ -13,6 +14,7 @@ import '../vendor/moki/web/ui-motion.css'
 import './theme.css'
 import './library.css'
 import './preview.css'
+import './selection-composer.css'
 
 const query=new URLSearchParams(location.search)
 const parentOrigin=query.get('parent') || '', bridge=query.get('bridge') || ''
@@ -39,11 +41,11 @@ async function post(path:string,data:object) {
   if(!result.ok) throw new Error((await result.json()).error || uiText("DSH 连接失败"))
   return result.json()
 }
-async function publish(focused=false) {
-  const state={active,focused,seq:++seq,selection,chatId,previewId}
+async function publish(focused=false,requested=selection) {
+  const state={active,focused,seq:++seq,selection:requested,chatId,previewId}
   try {
     await post('state',state)
-    if (seq===state.seq) send('selection',{selection})
+    if (seq===state.seq) send('selection',{selection:requested})
     return true
   } catch (error) { send('error',{message:String(error)});return false }
 }
@@ -64,7 +66,11 @@ window.addEventListener('moki:preview-snapshot',event=>{
 })
 async function compose(event?:Event){
   if(!active && !standalone)return
-  const requested=selection,quoteSelection=Boolean((event as CustomEvent|undefined)?.detail?.quoteSelection)
+  const detail=(event as CustomEvent|undefined)?.detail
+  const requested=selection,quoteSelection=Boolean(detail?.quoteSelection)
+  if(quoteSelection&&detail?.anchor){
+    window.dispatchEvent(new CustomEvent('moki:quick-compose-open',{detail:{selection:requested,anchor:detail.anchor,fileId:previewId}}));return
+  }
   try{await imagePending}catch{return}
   if(standalone){
     window.dispatchEvent(new CustomEvent('moki:preview-compose',{detail:{selection:requested,quoteSelection}}))
@@ -139,6 +145,37 @@ const initializeDocument=(data:Parameters<React.ComponentProps<typeof DocumentPr
   send('location',{itemId:documentId,previewing:true});void publish()
 }
 const closeDocument=()=>{if(standalone)void post('document-action',{action:'close'}).catch(documentError);else send('close-document')}
+async function submitQuickChat(requested:NonNullable<typeof selection>,submission:QuickSubmission,fileId:string|null){
+  if((!active&&!standalone)||previewId!==fileId)throw new Error(uiText('当前文件或会话已切换，请重新发送'))
+  await imagePending
+  if(!await publish(true,requested))throw new Error(uiText('DSH 连接失败'))
+  return new Promise<void>((resolve,reject)=>{
+    const finish=(result:{error?:string})=>{clearTimeout(timer);cleanup();result.error?reject(new Error(result.error)):resolve()}
+    let cleanup=()=>{}
+    const timer=setTimeout(()=>finish({error:uiText('连接 DSH 超时，请重试。')}),180000)
+    if(standalone){
+      const receive=(event:Event)=>{const result=(event as CustomEvent).detail;if(result?.id===submission.id)finish(result)}
+      window.addEventListener('moki:quick-submit-result',receive)
+      cleanup=()=>window.removeEventListener('moki:quick-submit-result',receive)
+      window.dispatchEvent(new CustomEvent('moki:preview-compose',{detail:{selection:requested,submission}}))
+    }else{
+      const channel=new MessageChannel();cleanup=()=>channel.port1.close();channel.port1.onmessage=event=>finish(event.data)
+      parent.postMessage({bridge,type:'quick-submit',selection:requested,submission},parentOrigin,[channel.port2])
+    }
+  })
+}
+function QuickComposerHost(){
+  const [value,setValue]=React.useState<{selection:NonNullable<typeof selection>;anchor:{x:number;y:number};fileId:string|null}|null>(null)
+  React.useEffect(()=>{
+    const open=(event:Event)=>{const detail=(event as CustomEvent).detail;if(detail?.selection)setValue(detail)}
+    const location=(event:Event)=>{const detail=(event as CustomEvent).detail;setValue(current=>current&&(!detail?.previewing||current.fileId!==detail.itemId)?null:current)}
+    window.addEventListener('moki:quick-compose-open',open);window.addEventListener('moki:library-location',location)
+    return()=>{window.removeEventListener('moki:quick-compose-open',open);window.removeEventListener('moki:library-location',location)}
+  },[])
+  if(!value)return null
+  let excerpt='';try{const data=JSON.parse(value.selection.content);excerpt=String(data.selectedText??data.editorSelection?.selectedText??'').slice(0,180)}catch{}
+  return <SelectionComposer key={value.selection.content+value.anchor.x+':'+value.anchor.y} anchor={value.anchor} label={value.selection.label} excerpt={excerpt} t={uiText} onClose={()=>setValue(null)} onSend={submission=>submitQuickChat(value.selection,submission,value.fileId)}/>
+}
 let chatRequest=Promise.resolve()
 const previewChatAction=(action:'compose'|'hide-chat'|'activate-chat')=>{
   const next=chatRequest.then(async()=>{
@@ -163,7 +200,7 @@ function LocalizedLibrary(){
   return <PageStateProvider>{documentId
   ? <DocumentPreview standalone={standalone} resumeOffice={query.get('resumeOffice')==='1'} initialize={initializeDocument} close={closeDocument} chatAction={previewChatAction}
       dock={async (office,destination)=>{await post('document-action',{action:destination==='main'?'main':'dock',office})}}/>
-  : <LibraryPage/>}</PageStateProvider>
+  : <LibraryPage/>}<QuickComposerHost/></PageStateProvider>
 }
 createRoot(document.getElementById('root')!).render(<LocalizedLibrary/>)
 send('ready')

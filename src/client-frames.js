@@ -3,8 +3,10 @@ import { l as uiText, getLocale, subscribeLocale } from './i18n.js';
 // panels preserves the editor, selection, scroll position and unsaved changes.
 import {installLibraryDrag} from './client-drag.js'
 import {previewDestination} from './preferences.mjs'
+import {createQuickPromptSender} from './quick-prompt.js'
 
 export function createFramePool(isDark,ctx,quote,settings) {
+  const submitQuick=createQuickPromptSender(ctx,uiText)
   const entries = new Map()
   const desktop=sessionStorage.getItem('moki-library-desktop') || crypto.randomUUID(), handling=new Set()
   sessionStorage.setItem('moki-library-desktop',desktop)
@@ -268,6 +270,26 @@ export function createFramePool(isDark,ctx,quote,settings) {
           if (entry.state.selection?.content !== message.selection?.content || entry.state.selection?.label !== message.selection?.label) update(entry,{selection:message.selection})
           break
         case 'location': entry.itemId = message.itemId; if (entry.state.previewing !== message.previewing) update(entry,{previewing:message.previewing}); break
+        case 'quick-submit': {
+          const reply=event.ports[0];if(!reply||!entry.host)break
+          const mode=entry.mode,sequence=entry.sequence,itemId=entry.itemId
+          const getTarget=()=>mode==='side'?ctx.uiSession.adapter.current.getSnapshot().key:entry.state.chatTarget||entry.chatSession||ctx.uiSession.adapter.current.getSnapshot().key
+          void (async()=>{
+            if(!getTarget())ctx.uiWorkspace.startSession()
+            for(let attempt=0;!getTarget()&&attempt<50;attempt++)await new Promise(resolve=>setTimeout(resolve,80))
+            const target=getTarget();if(!target)throw new Error(uiText('请先在 DSH 中打开工作区。'))
+            const valid=()=>Boolean(entry.host&&entry.sequence===sequence&&entry.mode===mode&&entry.itemId===itemId&&getTarget()===target)
+            await bindChat(entry,target)
+            const text=[quote(message.selection)?.split('\n').map(line=>'> '+line).join('\n'),message.submission?.prompt].filter(Boolean).join('\n\n')
+            const result=await submitQuick(target,{...message.submission,text},{valid})
+            if(valid()){
+              if(mode==='main'&&!entry.chatSession&&!entry.state.chatTarget)update(entry,{chatTarget:target})
+              compose(entry,{selection:message.selection,quoteSelection:false})
+            }
+            return result
+          })().then(result=>reply.postMessage(result),error=>reply.postMessage({error:error.message})).finally(()=>reply.close())
+          break
+        }
         case 'compose': compose(entry,message); break
         case 'exit': update(entry,{chat:false,quoteRequest:null}); break
         case 'error': update(entry,{notice:message.message}); break

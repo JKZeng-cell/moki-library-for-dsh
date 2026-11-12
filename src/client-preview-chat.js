@@ -1,8 +1,10 @@
 import { l as uiText, useLibraryLocale } from './i18n.js';
 import {insertSelectionQuote} from './selection-quote.js';
+import {createQuickPromptSender} from './quick-prompt.js';
 // This seat runs in the official DSH web client at DSH's own origin.
 // The document in the parent can request UI actions, never DSH RPCs.
 export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBinding,quote,QuoteContext,css,createPortal}) {
+  const submitQuick=createQuickPromptSender(ctx,uiText)
   const h=React.createElement, panel='moki-preview-chat', channel='moki-preview-chat'
   async function context(sessionId) {
     const headers={'x-moki-preview-chat':key}
@@ -20,6 +22,7 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
     const [selection,setSelection]=React.useState(null)
     const [quoteRequest,setQuoteRequest]=React.useState(null)
     const quoteTarget=React.useRef(null),handledQuote=React.useRef(null)
+    const pendingQuick=React.useRef(null),sendingQuick=React.useRef(null)
     const parentOrigin=React.useRef(null),anchor=React.useRef(null)
     React.useLayoutEffect(()=>{
       const shell=anchor.current?.closest('#root > *')
@@ -41,11 +44,12 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
       const receive=event=>{
         if(event.source!==parent || event.origin!==parentOrigin.current || event.data?.channel!==channel)return
         if(event.data.action==='selection')setSelection(event.data.selection)
-        else if(event.data.action==='cancel-quote')setQuoteRequest(null)
+        else if(event.data.action==='cancel-quote'){pendingQuick.current=null;setQuoteRequest(null)}
         else if(event.data.action==='quote'){
           const request=event.data.request
           if(!request?.id || !request.selection)return
           if(handledQuote.current?.id===request.id){post('quote-result',handledQuote.current);return}
+          pendingQuick.current=request.id
           setQuoteRequest({...request,target:quoteTarget.current})
         }
         else if(['focus','new','history'].includes(event.data.action))window.dispatchEvent(new CustomEvent('moki:preview-chat-command',{detail:event.data.action}))
@@ -53,7 +57,7 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
       const activate=()=>post('activate')
       window.addEventListener('message',receive)
       window.addEventListener('focus',activate)
-      return ()=>{live=false;window.removeEventListener('message',receive);window.removeEventListener('focus',activate)}
+      return ()=>{live=false;pendingQuick.current=null;window.removeEventListener('message',receive);window.removeEventListener('focus',activate)}
     },[])
     const catalog=useSource(ctx.sessions.list),current=useSource(ctx.uiSession.adapter.current)
     // A newly connected web client receives the catalog asynchronously.
@@ -67,6 +71,17 @@ export function registerPreviewChat(ctx,React,{key,Chat,Conversation,useChatBind
     const input=useSource(session?.hooks.input || empty),actions=session?.props.inputActions
     React.useEffect(()=>{
       if(!quoteRequest||handledQuote.current?.id===quoteRequest.id||!selected||!chat.reference)return
+      if(quoteRequest.submission){
+        if(sendingQuick.current===quoteRequest.id)return
+        const request=quoteRequest,target=selected;sendingQuick.current=request.id
+        const text=[quote(request.selection)?.split('\n').map(line=>'> '+line).join('\n'),request.submission.prompt].filter(Boolean).join('\n\n')
+        void submitQuick(target,{...request.submission,text},{valid:()=>pendingQuick.current===request.id&&quoteTarget.current===target&&(!request.target||request.target===target)}).then(()=>{
+          handledQuote.current={id:request.id,added:true,sent:true};post('quote-result',handledQuote.current)
+        },error=>post('quote-result',{id:request.id,added:false,error:error.message})).finally(()=>{
+          sendingQuick.current=null;if(pendingQuick.current===request.id){pendingQuick.current=null;setQuoteRequest(null)}
+        })
+        return
+      }
       const result=quoteRequest.target&&quoteRequest.target!==selected?{added:false}:insertSelectionQuote(quoteRequest,input,actions,quote)
       if(!result)return
       handledQuote.current={id:quoteRequest.id,...result};setQuoteRequest(null);post('quote-result',handledQuote.current)

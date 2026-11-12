@@ -3,6 +3,7 @@ import React,{useCallback,useEffect,useRef,useState} from 'react'
 import {History,SquarePen,X} from 'lucide-react'
 import {useChatLayout} from '../src/chat-layout'
 import '../src/client-shell.css'
+import type {QuickSubmission} from './selection-composer'
 
 type Props={origin?:string;action:(value:'compose'|'hide-chat'|'activate-chat')=>Promise<void>}
 export function PreviewChat({origin,action}:Props) {
@@ -11,13 +12,14 @@ export function PreviewChat({origin,action}:Props) {
   const [connected,setConnected]=useState(false)
   const [status,setStatus]=useState({title:uiText("DSH 对话"),creating:false,history:false})
   const ready=useRef(false),open=useRef(false),selection=useRef<unknown>(null)
-  const quoteRequest=useRef<{id:string;selection:unknown}|null>(null)
+  const quoteRequest=useRef<{id:string;selection:unknown;submission?:QuickSubmission}|null>(null)
   const returnFocus=useRef<HTMLElement|null>(null),timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined)
   const sequence=useRef(0)
   const send=useCallback((command:string,data:object={})=>{
     if(origin)iframe.current?.contentWindow?.postMessage({channel:'moki-preview-chat',action:command,...data},origin)
   },[origin])
   const close=useCallback(()=>{
+    if(quoteRequest.current?.submission)window.dispatchEvent(new CustomEvent('moki:quick-submit-result',{detail:{id:quoteRequest.current.id,error:uiText('当前文件或会话已切换，请重新发送')}}))
     send('cancel-quote')
     open.current=false;quoteRequest.current=null;sequence.current++;clearTimeout(timer.current);show(false)
     void action('hide-chat').catch(()=>{})
@@ -42,7 +44,7 @@ export function PreviewChat({origin,action}:Props) {
     const invoke=(event:Event)=>{
       const detail=(event as CustomEvent).detail
       selection.current=detail?.selection
-      quoteRequest.current=detail?.quoteSelection?{id:crypto.randomUUID(),selection:detail.selection}:null
+      quoteRequest.current=detail?.submission?{id:detail.submission.id,selection:detail.selection,submission:detail.submission}:detail?.quoteSelection?{id:crypto.randomUUID(),selection:detail.selection}:null
       connect()
     }
     const selected=(event:Event)=>{
@@ -57,7 +59,10 @@ export function PreviewChat({origin,action}:Props) {
         ready.current=true;clearTimeout(timer.current);setConnected(true);setError('')
         send('selection',{selection:selection.current});if(open.current){if(quoteRequest.current)send('quote',{request:quoteRequest.current});send('focus')}
       }
-      if(data.action==='quote-result' && data.id===quoteRequest.current?.id){quoteRequest.current=null;if(!data.added)setError(uiText('当前对话输入框暂时无法接收选区'))}
+      if(data.action==='quote-result' && data.id===quoteRequest.current?.id){
+        if(quoteRequest.current?.submission)window.dispatchEvent(new CustomEvent('moki:quick-submit-result',{detail:{id:data.id,...(!data.added?{error:data.error||uiText('DSH 未能发送，请检查会话后重试')}:{})}}))
+        quoteRequest.current=null;if(!data.added)setError(data.error||uiText('当前对话输入框暂时无法接收选区'))
+      }
       if(data.action==='state')setStatus({title:String(data.title),creating:Boolean(data.creating),history:Boolean(data.history)})
       if(data.action==='close' && open.current)close()
       if(data.action==='activate')activate()

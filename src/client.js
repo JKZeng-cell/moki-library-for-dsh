@@ -34,7 +34,7 @@ window.__ModuleLoader__.load({
       return state?.sessionId===sessionId ? state : null
     }
     return {
-      inject:['slots','sidebarRight','sidebarRightTabs','layout','uiWorkspace','workspaces','sessions','uiConversation','uiSession','fileDrag','locale','configForms'],
+      inject:['slots','sidebarRight','sidebarRightTabs','layout','uiWorkspace','workspaces','sessions','conversation','uiConversation','uiSession','fileDrag','locale','configForms'],
       apply(ctx){
         const settings=librarySettings(ctx,React,require('react-dom').createPortal,Icon,ui)
         ctx.effect(()=>watchLibraryLanguage(ctx.locale,settings.form,setLocale),'moki-library: interface language')

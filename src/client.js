@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
         const pool = createFramePool(isDark,ctx,quote,settings.form)
         ctx.effect(()=>()=>pool.dispose(),'moki-library: open documents')
         registerPanels(ctx,React,{Icon,Chat,Conversation,useChatBinding,quote,publish,views,pool,css,kind,type,t,ui,SettingsButton:settings.SettingsButton})
-        registerGeneratedFileActions(ctx,React,{Icon,ui,pool})
+        registerGeneratedFileActions(ctx,React,{Icon,ui,pool,Modal:settings.Modal})
       }
     }
   }

@@ -26,3 +26,6 @@ button:disabled { cursor:default; }
 .moki-powerpoint-viewer > .rpv-toolbar { flex:0 0 48px; }
 .moki-powerpoint-viewer > .rpv-workspace { flex:1 1 0; min-height:0; height:auto; max-height:none; overflow:hidden; }
 .moki-powerpoint-viewer .rpv-filmstrip { height:100%; min-height:0; overflow-y:auto; }
+.moki-html-module-outline { position:fixed; z-index:89; pointer-events:none; box-sizing:border-box; border:1px dashed #3b82f6; border-radius:3px; background:rgba(59,130,246,.045); }
+.moki-html-module-outline[data-module-outline="chosen"] { border:2px solid #3b82f6; background:rgba(59,130,246,.1); box-shadow:0 0 0 1px rgba(255,255,255,.75); }
+.moki-html-module-outline > span { position:absolute; top:2px; left:2px; max-width:calc(100% - 4px); padding:2px 5px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:11px/16px system-ui,sans-serif; color:#fff; background:#2563eb; border-radius:3px; }

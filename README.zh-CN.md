@@ -55,9 +55,9 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 请帮我在当前 DSH 桌面端安装「MOKI资料库」插件，完成下载、安装和版本验证。
 
 仓库：https://github.com/JKZeng-cell/moki-library-for-dsh
-版本：0.1.69
-安装包：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.69/dsh-moki-library-0.1.69.tgz
-校验清单（SHA256）：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.69/SHA256SUMS.txt
+版本：0.1.70
+安装包：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.70/dsh-moki-library-0.1.70.tgz
+校验清单（SHA256）：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.70/SHA256SUMS.txt
 
 请依次执行：
 1. 检查当前系统、DSH 版本和它使用的 Node.js。插件要求 DSH >=0.2.2-rc.1 <0.3.0、Node.js >=22.19，主要验证环境为 Windows 桌面端。
@@ -67,7 +67,7 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
    dsh plugin --profile desktop add "dsh-moki-library@file:<安装包绝对路径>" --allow-build=sharp
 5. 执行版本检查：
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   以命令结果确认安装到 desktop 的版本为 0.1.69（或原有的更新版本）。保留现有插件、配置和资料库数据。
+   以命令结果确认安装到 desktop 的版本为 0.1.70（或原有的更新版本）。保留现有插件、配置和资料库数据。
 6. 汇报安装包位置、实际使用的 CLI、配置和版本检查结果，再提醒我保存工作、手动完全退出并重新打开 DSH。安装任务进行中请保持当前 DSH 会话运行。
 
 如果当前会话不能下载或执行终端、环境不兼容，或安装失败，请说明具体原因和下一步操作，安装状态以实际命令结果为准。
@@ -81,12 +81,12 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 
 ### 方式二：在终端手动安装
 
-1. 先启动一次 DSH 桌面端完成配置初始化，再完全退出。在 [Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.69) 下载 `dsh-moki-library-0.1.69.tgz`。
+1. 先启动一次 DSH 桌面端完成配置初始化，再完全退出。在 [Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.70) 下载 `dsh-moki-library-0.1.70.tgz`。
 2. 在 PowerShell 中把前两行替换为实际路径，再执行安装。若桌面端使用了自定义 `DSH_HOME`，终端也要沿用同一个值。
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.69.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.70.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -141,9 +141,13 @@ HTML 渲染预览也支持选中文字 → 小鲸鱼 → 输入指令（可附�
 
 ### 选区、附件和任务文件
 
+HTML 预览中开启「选区模式」，鼠标悬停会显示页面模块边界，点击后保持高亮并显示小鲸鱼，可直接输入协作指令。引用会携带模块文字、元素位置和限长的 HTML 片段；支持图片、链接等非纯文本模块。按 **Alt+↑** 选择上级模块，按 **Esc** 清除选中。滚动时高亮跟随模块位置，选区模式内点击链接不会跳转；关闭后恢复普通文字选择。
+
 「选区加入对话」传递当前所选内容和位置；「资料库 → 添加附件」提供选中的文件。后者需要在设置中开启「对话输入框显示资料库」。另一个可选设置「自动映射 DSH 任务文件」会将开启后 DSH 新建或交付的本地文件收纳到「DSH 任务文件」，相同路径只映射一次。
 
 DSH 生成文件卡片及改动查看页增加「资料库」打开按钮，文件右键菜单也提供「在 MOKI资料库中打开」。首次打开时映射原文件到「DSH 任务文件」，重复打开复用已有映射；无需开启自动映射，也不会复制或改写文件。主窗口/独立窗口按资料库预览设置打开，自动模式下已打开的侧边资料库会新建文件标签页。显式选择在资料库打开时，即使默认预览设置为系统应用，也会进入资料库主窗口。
+
+需要指定归档位置时，右键文件选择「添加到 MOKI资料库」，浏览或搜索目标文件夹，也可现场新建带颜色的文件夹，然后点击「添加到此文件夹」。支持资料库根目录、虚拟文件夹及已映射的本地文件夹。只添加原文件的映射，不搬移或复制文件；同一文件夹重复添加会复用已有映射，其他文件夹中的引用保持不变。无需开启自动映射或对话附件组件。
 
 小鲸鱼会打开与 MOKI 白板一致的快捷输入框；在侧边工作区发送后聚焦当前主对话框，方便边看文件边对话。DSH 对话按钮和 Alt+D 仍直接打开对话。主窗口和独立预览窗口使用可移动、调整大小、新建会话和切换历史的浮窗，保留 DSH 原生输入能力；独立窗口的浮窗位于当前预览内。切回侧边工作区后，快捷指令会进入当前主会话，不会继续使用浮窗中之前选择的历史会话。
 

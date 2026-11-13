@@ -10,7 +10,7 @@ export function compactSelection(data,{maxChars=4000,detail='compact'}={}){
   const result={...pick(data,['file','mode']),location:pick(location,[
     'kind','scope','indexUnit','unitId','sheetId','sheetName','range','row','column','endRow','endColumn',
     'slideId','page','endPage','slideName','selectedElementIds','textSelection','startOffset','endOffset','segmentId','collapsed',
-    'start','end','line','endLine','endColumn','path','element','byteOffset','time','duration','coordinateSpace','surface','region','point'
+    'start','end','line','endLine','endColumn','path','element','module','byteOffset','time','duration','coordinateSpace','surface','region','point'
   ])}
   if(Array.isArray(location.ranges)&&!(location.ranges.length===1&&location.ranges[0]===location.range))result.location.ranges=location.ranges
   let remaining=maxChars,truncated=Boolean(data.selectedTextTruncated||location.truncated||location.cellsTruncated)
@@ -29,6 +29,10 @@ export function compactSelection(data,{maxChars=4000,detail='compact'}={}){
     if(location.elements?.length&&!location.textSelection){
       result.elements=location.elements.map(element=>({...pick(element,['id','name','type','transform'])}))
     }
+  }
+  if(location.module && data.htmlModule){
+    result.source=bounded(data.htmlModule.source)
+    if(data.htmlModule.truncated)truncated=true
   }
   if(truncated)result.truncated=true
   if(data.visual)result.visual=pick(data.visual,['width','height'])

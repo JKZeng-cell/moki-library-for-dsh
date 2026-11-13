@@ -1,4 +1,5 @@
 import {l as uiText,useLibraryLocale} from './i18n.js'
+import {generatedRequest,createFileDestination} from './client-file-destination.js'
 
 export function generatedCoordinates(actionUrl) {
   const url=new URL(actionUrl,location.href)
@@ -8,15 +9,21 @@ export function generatedCoordinates(actionUrl) {
   if(!sessionId||!/^\d+$/.test(seq??'')||!/^\d+$/.test(index??''))throw Error('Invalid DSH file coordinates')
   return {kind,sessionId,seq:Number(seq),index:Number(index)}
 }
-export function registerGeneratedFileActions(ctx,React,{Icon,ui,pool}) {
+export function registerGeneratedFileActions(ctx,React,{Icon,ui,pool,Modal}) {
   const h=React.createElement,pending=new Map()
+  let destination=null
+  const listeners=new Set(),notify=()=>{for(const listener of listeners)listener()}
+  const FileDestination=createFileDestination(React,{Icon,ui,pool,Modal})
+  function DestinationHost(){
+    const file=React.useSyncExternalStore(listener=>{listeners.add(listener);return ()=>listeners.delete(listener)},()=>destination)
+    return file&&h(FileDestination,{key:JSON.stringify(file),file,onClose:()=>{destination=null;notify()}})
+  }
+  ctx.slots.inject('shell.overlay',()=>ctx.slots.register({name:'shell.overlay',id:'moki-library.destination'},DestinationHost))
   const open=input=>{
     const key=JSON.stringify(input)
     if(pending.has(key))return pending.get(key)
     const task=(async()=>{
-      const response=await fetch('/moki-library/generated-file',{cache:'no-store',headers:{'x-moki-library':'1','x-moki-generated-file':encodeURIComponent(JSON.stringify(input))}})
-      const result=await response.json()
-      if(!response.ok||result.error)throw Error(result.error||uiText('无法在资料库中打开此文件'))
+      const result=await generatedRequest(input)
       await pool.openFile(result.item,input.sessionId)
     })().finally(()=>pending.delete(key))
     pending.set(key,task);return task
@@ -38,7 +45,9 @@ export function registerGeneratedFileActions(ctx,React,{Icon,ui,pool}) {
         const result=await child.remote.workspaceFiles.stat(sessionId,path,signal)
         signal.throwIfAborted()
         return [{id:'moki-library.open',icon:{key:'moki-library.open'},label:uiText('在 MOKI资料库中打开'),disabled:!result.ok,
-          failureLabel:uiText('无法在资料库中打开此文件'),run:()=>open({kind:'path',sessionId,path:result.value.absolutePath})}]
+          failureLabel:uiText('无法在资料库中打开此文件'),run:()=>open({kind:'path',sessionId,path:result.value.absolutePath})},
+          {id:'moki-library.add',icon:{key:'moki-library.open'},label:uiText('添加到 MOKI资料库'),disabled:!result.ok,
+            failureLabel:uiText('无法读取此文件'),run:()=>{if(destination)return;destination={kind:'path',sessionId,path:result.value.absolutePath};notify()}}]
       }
     }),'moki-library: file context action')
   })

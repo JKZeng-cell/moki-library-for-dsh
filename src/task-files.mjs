@@ -70,7 +70,25 @@ export function taskFileMapper(db, repository, config, change) {
     }catch(error){db.exec('ROLLBACK');throw error}
     change(folder.id);return item
   }
-  return {enabled, map, open, close(){closed=true}}
+  // Explicit filing is scoped to the chosen folder. An existing reference in
+  // another folder remains there; repeated clicks in this folder are idempotent.
+  async function add(path,parentId) {
+    if(closed || typeof path!=='string' || !isAbsolute(path))throw Error('Invalid local file')
+    const actual=await realpath(path),info=await lstat(actual),key=keyOf(actual)
+    if(!info.isFile())throw Error('请选择可访问的本地文件')
+    if(parentId!==null && !['folder','local_folder'].includes(repository.find(parentId)?.kind))throw Error('目标文件夹已不存在，请重新选择')
+    const existing=repository.list({parentId,thumbnails:'omit'}).find(row=>row.kind==='local_file' && row.target && [key,keyOf(path)].includes(keyOf(row.target)))
+    if(existing)return {item:existing,existing:true}
+    let item
+    db.exec('BEGIN IMMEDIATE')
+    try {
+      item=repository.create({kind:'local_file',name:basename(actual),target:actual,parentId,tags:[],fileCreatedAt:info.birthtime.toISOString(),fileModifiedAt:info.mtime.toISOString()})
+      db.prepare('INSERT OR IGNORE INTO dsh_task_outputs VALUES (?)').run(key)
+      db.exec('COMMIT')
+    }catch(error){db.exec('ROLLBACK');throw error}
+    change(parentId);return {item,existing:false}
+  }
+  return {enabled, map, open, add, close(){closed=true}}
 }
 
 export function listenForTaskFiles(ctx, mapper) {

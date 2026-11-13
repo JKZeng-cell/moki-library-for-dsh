@@ -41,6 +41,7 @@ export const ResourceLibraryMoveSchema = z.object({
 
 export const ResourceLibraryContentUpdateSchema = z.object({
   expectedVersion: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  baseContent: z.string().max(5_000_000).optional(),
   content: z.string().max(5_000_000),
 }).strict();
 

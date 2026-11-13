@@ -55,9 +55,9 @@ Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.
 Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
 
 Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
-Version: 0.1.71
-Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.71/dsh-moki-library-0.1.71.tgz
-SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.71/SHA256SUMS.txt
+Version: 0.1.72
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.72/dsh-moki-library-0.1.72.tgz
+SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.72/SHA256SUMS.txt
 
 Follow these steps:
 1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
@@ -67,7 +67,7 @@ Follow these steps:
    dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
 5. Check the installed version:
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   Confirm that desktop lists version 0.1.71 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+   Confirm that desktop lists version 0.1.72 (or the newer version retained above). Preserve existing plugins, configuration and library data.
 6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
 
 If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
@@ -81,12 +81,12 @@ If this conversation cannot download files or execute a terminal, the environmen
 
 ### Option 2: Install manually in a terminal
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.71.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.71).
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.72.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.72).
 2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.71.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.72.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -114,6 +114,8 @@ The GitHub source archive is for development; the `.tgz` release asset is the bu
 Text previews, PDF text, the text editor and Office editors support quick selection chat, including file and precise location references. Mouse and keyboard selection work in side workspace tabs and separate preview windows. Opening the quick input never sends a message. Its Send button submits only the captured selection, your instruction and its attachments; existing DSH draft text and attachments stay intact. Failed sends retain the quick input for retry. Files use DSH’s native attachment pipeline (32 MB per file). Use visual region selection for scanned PDFs; selections in the default external application remain managed by that application.
 
 ### Review before saving
+
+Use **Refresh preview** in the file toolbar to reload the original file. If a draft is unsaved, choose to keep editing, save and refresh, or discard the draft and refresh. Pending AI edits still require review before saving. DSH source-file updates are distinct from draft changes: identical content already saved elsewhere is acknowledged without rewriting it. Text/HTML saves can reconcile strictly separated edits against a verified baseline; overlapping edits remain protected. Office saves compare document contents rather than modification time alone and recheck the source after export.
 
 AI edits to text, Word, Excel and PowerPoint are highlighted. Expand the review bar to see locations and before/after content. Highlights are temporary decorations, never saved document formatting. **Accept saves the current result to the original file without reloading or leaving the editor.** The current slide, sheet, selection and view stay in place. If saving fails, the pending edits remain available for retry.
 

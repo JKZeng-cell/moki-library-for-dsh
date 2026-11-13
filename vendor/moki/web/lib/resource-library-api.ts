@@ -352,7 +352,7 @@ export async function insertResourceLibraryUniverImage(
 export async function saveResourceLibraryUniverSession(
   id: string,
   sessionId: string,
-): Promise<{ saved: true; size: number; updatedAt: string }> {
+): Promise<{ saved: true; size: number; updatedAt: string; sourceUpdated?:boolean; unchanged?:boolean }> {
   const response = await apiFetch(
     `/api/library/items/${encodeURIComponent(id)}/univer-session/${encodeURIComponent(sessionId)}/save`,
     { method: "POST" },
@@ -475,11 +475,11 @@ export async function getResourceLibraryTextContent(id: string): Promise<Resourc
   return response.json() as Promise<ResourceLibraryTextContent>;
 }
 
-export async function saveResourceLibraryTextContent(id: string, content: string, expectedVersion?: string): Promise<{ saved: true; version?: string; size: number; updatedAt: string }> {
+export async function saveResourceLibraryTextContent(id: string, content: string, expectedVersion?: string, baseContent?: string): Promise<{ saved: true; version?: string; size: number; updatedAt: string; content?:string; reconciled?:boolean; unchanged?:boolean }> {
   const response = await apiFetch(`/api/library/items/${encodeURIComponent(id)}/content`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content, expectedVersion }),
+    body: JSON.stringify({ content, expectedVersion, baseContent }),
   });
   if (!response.ok) throw new Error(await errorMessage(response, uiText("资料文本保存失败")));
   return response.json() as Promise<{ saved: true; version?: string; size: number; updatedAt: string }>;

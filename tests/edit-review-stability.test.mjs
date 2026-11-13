@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtemp,readFile,rm} from 'node:fs/promises'
+import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import puppeteer from 'puppeteer-core'
@@ -57,6 +57,12 @@ test('AI progress and no-op Office operations preserve the loaded editor and sel
     assert.equal(office.reviewStatus(editor.sessionId,item.id).entries.length,0,'read-only calls must not create review entries')
   }
 
+  await writeFile(item.target,original)
+  await runtime.taskFiles.changed([item.target])
+  await page.waitForFunction(()=>document.body.textContent.includes('原文件已更新，点击刷新查看'))
+  assert.equal(runtime.session(owner).editors.list().find(entry=>entry.editorId===editor.editorId).dirty,false,'a source-file notification must not dirty the Office draft')
+  assert.equal(navigations,0,'external notifications never reload a live Office editor')
+
   // Real remote data still reaches the existing viewer while the task is busy.
   let finish
   const completing=new Promise(resolve=>{finish=resolve})
@@ -87,6 +93,8 @@ test('AI progress and no-op Office operations preserve the loaded editor and sel
   await delay(300)
   const view=()=>frame.evaluate(()=>{const s=univerAPI.getActiveWorkbook().getActiveSheet();return {range:s.getActiveRange().getA1Notation(),zoom:s.getZoom(),scroll:s.getScrollState()}})
   const before=await view();assert.equal(before.range,'D40');assert.equal(before.zoom,.8)
+  const exported=await office.exportDraft(editor.sessionId,item.id)
+  await writeFile(item.target,await readFile(exported.path))
   await page.click('.moki-review-buttons [data-primary]')
   await page.waitForFunction(()=>!document.querySelector('.moki-edit-review'))
   await frame.waitForFunction(()=>document.documentElement.dataset.mokiReviewLocked==='false')

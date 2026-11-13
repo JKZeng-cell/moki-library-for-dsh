@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const queues = new Map<string, Promise<void>>();
-export type DraftMetadata = { sourcePath: string; nativeWorktreeId?: string; review?: unknown; version?: string; sourceSize?: number; sourceModifiedMs?: number; savedAt: string; file: string };
+export type DraftMetadata = { sourcePath: string; nativeWorktreeId?: string; review?: unknown; version?: string; sourceVersion?:string; baselineHeads?:string; sourceSize?: number; sourceModifiedMs?: number; savedAt: string; file: string };
 /** An atomic manifest points at an immutable snapshot. A failed save preserves the last snapshot. */
 export class EditorDraftStore {
   constructor(private readonly directory: string) {}

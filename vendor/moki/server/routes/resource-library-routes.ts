@@ -2,7 +2,7 @@ import { EditorDraftStore } from "../../documents/editor-draft-store.js";
 import {inspectPreviewFile,byteRange} from '../../../../src/preview-files.mjs';
 import {readZipParts} from '../../../../src/preview-archive.mjs';
 import { deleteResourceLibrarySource } from "../services/resource-library-source-delete.js";
-import { fileContentVersion, FileEditConflict, withFileEdit } from "../../documents/file-edit-guard.js";
+import { fileContentVersion, FileEditConflict, withFileEdit, reconcileTextSave } from "../../documents/file-edit-guard.js";
 import { replaceFileAtomically } from "../../documents/workbench-office-editor.js";
 import { EDITABLE_TEXT_EXTENSIONS } from "../../shared/editable-text.js";
 import { createHash, randomUUID } from "node:crypto";
@@ -1231,7 +1231,7 @@ export async function registerResourceLibraryRoutes(
       });
     }
   });
-  app.put("/api/library/items/:id/content", async (request, reply) => {
+  app.put("/api/library/items/:id/content", {bodyLimit:64_000_000}, async (request, reply) => {
     const params = paramsSchema.safeParse(request.params);
     const body = ResourceLibraryContentUpdateSchema.safeParse(request.body);
     if (!params.success || !body.success) return reply.code(400).send({ error: "文本保存参数无效" });
@@ -1245,10 +1245,20 @@ export async function registerResourceLibraryRoutes(
     try {
       const file = await stat(item.target);
       if (!file.isFile()) return reply.code(400).send({ error: "映射目标不是文件" });
-      await withFileEdit(item.target, body.data.expectedVersion, async (_original, canonical) => {
-        await replaceFileAtomically(canonical, Buffer.from(body.data.content, "utf8"));
+      return await withFileEdit(item.target, undefined, async (original, canonical) => {
+        const content = reconcileTextSave(original.toString('utf8'),body.data.content,body.data.expectedVersion,body.data.baseContent);
+        const bytes = Buffer.from(content,'utf8'), unchanged = original.equals(bytes);
+        if(bytes.length>MAX_EDITABLE_CONTENT_BYTES)throw new Error('合并后的文本超过 5MB，请另存草稿');
+        if(!unchanged) {
+          // External applications do not share our queue. Recheck immediately
+          // before the atomic replacement, including after reconciliation.
+          if(fileContentVersion(await readFile(canonical))!==fileContentVersion(original))throw new FileEditConflict();
+          await replaceFileAtomically(canonical, bytes);
+        }
+        const saved=await stat(canonical);
+        return {saved:true,version:fileContentVersion(content),size:saved.size,updatedAt:saved.mtime.toISOString(),unchanged,
+          ...(content!==body.data.content?{content,reconciled:true}:{})};
       });
-      return { saved: true, version: fileContentVersion(body.data.content), size: Buffer.byteLength(body.data.content, "utf8"), updatedAt: new Date().toISOString() };
     } catch (error) {
       return reply.code(error instanceof FileEditConflict ? 409 : 400).send({ error: error instanceof Error ? `本地文件保存失败：${error.message}` : "本地文件保存失败" });
     }

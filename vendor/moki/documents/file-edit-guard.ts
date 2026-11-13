@@ -1,11 +1,35 @@
 import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
+import { createReadStream, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 const queues = new Map<string, Promise<void>>();
 
 export function fileContentVersion(content: string | Buffer): string {
   return createHash("sha256").update(content).digest("hex");
+}
+
+export async function fileVersion(path: string): Promise<string> {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path)) hash.update(chunk);
+  return hash.digest('hex');
+}
+
+// Repeated saves are successful no-ops. Only a verified baseline permits
+// reconciliation; independent changes to the same span still require review.
+export function reconcileTextSave(current: string, draft: string, expected?: string, base?: string): string {
+  if (current === draft || expected === undefined || fileContentVersion(current) === expected) return draft;
+  if (base === undefined || fileContentVersion(base) !== expected) throw new FileEditConflict();
+  if (draft === base) return current;
+  const edit = (next: string) => {
+    let start=0,end=base.length,stop=next.length;
+    while(start<end && start<stop && base[start]===next[start]) start++;
+    while(end>start && stop>start && base[end-1]===next[stop-1]) {end--;stop--;}
+    return {start,end,text:next.slice(start,stop)};
+  };
+  const a=edit(current),b=edit(draft);
+  // Strict separation also avoids ambiguous insertions at a replacement edge.
+  if (!(a.end < b.start || b.end < a.start)) throw new FileEditConflict();
+  return [a,b].sort((x,y)=>y.start-x.start).reduce((text,e)=>text.slice(0,e.start)+e.text+text.slice(e.end),base);
 }
 
 export class FileEditConflict extends Error {

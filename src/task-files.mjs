@@ -14,6 +14,20 @@ export function taskFileMapper(db, repository, config, change) {
   const record = db.prepare('INSERT INTO dsh_task_outputs VALUES (?)')
   let closed = false
   const enabled = () => !closed && option(config, 'autoMapTaskFiles') === true
+  async function changed(paths) {
+    if(closed)return []
+    const keys=new Set()
+    for(const path of new Set(paths)) {
+      if(typeof path!=='string'||!isAbsolute(path))continue
+      try {const actual=await realpath(path);if((await lstat(actual)).isFile()){keys.add(keyOf(path));keys.add(keyOf(actual))}}catch{}
+    }
+    if(!keys.size||closed)return []
+    const ids=[]
+    for(const row of db.prepare("SELECT id,target FROM resource_library_items WHERE kind='local_file' AND target IS NOT NULL").iterate()) {
+      if(keys.has(keyOf(row.target))){change(row.id,'file');ids.push(row.id)}
+    }
+    return ids
+  }
   async function map(paths) {
     if (!enabled()) return []
     const files = []
@@ -88,7 +102,7 @@ export function taskFileMapper(db, repository, config, change) {
     }catch(error){db.exec('ROLLBACK');throw error}
     change(parentId);return {item,existing:false}
   }
-  return {enabled, map, open, add, close(){closed=true}}
+  return {enabled, map, open, add, changed, close(){closed=true}}
 }
 
 export function listenForTaskFiles(ctx, mapper) {
@@ -98,9 +112,10 @@ export function listenForTaskFiles(ctx, mapper) {
       void mapper.map(event.data.files.map(file => file.path)).catch(report)
   })
   ctx.inject(['fs'], child => {
-    const creating = new WeakMap()
+    const creating = new WeakMap(),writing = new WeakMap()
     child.on('fs/write-intent', async (target, actor, next) => {
       const intent = await next()
+      if(actor?.agent?.session && intent){const paths=writing.get(actor)??new Set();paths.add(child.fs.processPath(target));writing.set(actor,paths)}
       if (mapper.enabled() && actor?.agent?.session && intent?.kind === 'createIfAbsent') {
         const paths = creating.get(actor) ?? new Set()
         paths.add(child.fs.processPath(target))
@@ -109,9 +124,11 @@ export function listenForTaskFiles(ctx, mapper) {
       return intent
     }, {prepend:true})
     child.on('fs/observed', (target, observation, actor) => {
-      const candidates = creating.get(actor)
-      if (!candidates || observation.kind !== 'present') return
+      if(observation.kind!=='present')return
       const path = child.fs.processPath(target)
+      if(writing.get(actor)?.delete(path))void mapper.changed([path]).catch(report)
+      const candidates = creating.get(actor)
+      if (!candidates) return
       if (candidates.delete(path)) void mapper.map([path]).catch(report)
     })
   })
@@ -122,14 +139,18 @@ export function listenForTaskFiles(ctx, mapper) {
     child.effect(() => () => lifetime.abort())
     child.on('session/event', (session, event) => {
       if (event.type === 'turn/start') {
-        if (mapper.enabled()) starts.set(session, {turn:event.data.turn, time:Date.now()})
-        else starts.delete(session)
+        starts.set(session, {turn:event.data.turn, time:Date.now()})
       }
       const start = starts.get(session)
-      if (event.type !== 'workspace/changes' || !mapper.enabled() || start?.turn !== event.data.turn) return
+      if (event.type !== 'workspace/changes' || start?.turn !== event.data.turn) return
       void Promise.resolve().then(async () => {
         const changes = child.workspaceChanges.summary(session.id, event.seq)
         if (!changes) return
+        if(lifetime.signal.aborted)return
+        // Existing mappings must track DSH writes even when automatic mapping
+        // of newly generated files is switched off.
+        await mapper.changed(changes.files.map(file=>resolve(changes.cwd,file.path)))
+        if(!mapper.enabled())return
         const paths = []
         for (const [index, file] of changes.files.entries()) {
           if (lifetime.signal.aborted || !mapper.enabled()) return

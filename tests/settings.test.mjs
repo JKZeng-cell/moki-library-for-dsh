@@ -67,12 +67,12 @@ test('task files use original paths, survive restarts and respect disabled and r
 })
 
 test('successful file creation, deliveries and new workspace files trigger mapping',async()=>{
-  const listeners=new Map(),calls=[],session={id:'s'},actor={agent:{session}}
+  const listeners=new Map(),calls=[],updates=[],session={id:'s'},actor={agent:{session}}
   let enabled=true
   const on=(name,fn)=>listeners.set(name,[...(listeners.get(name) ?? []),fn])
   const files=[{path:'kept.txt',deleted:0},{path:'existing.txt',deleted:0}]
   const child={on,effect(){},fs:{processPath:p=>p},workspaceChanges:{summary:()=>({cwd:tmpdir(),files}),diff:async(_s,_seq,index)=>({kind:'text',before:index!==0,after:true})}}
-  listenForTaskFiles({on,inject:(_deps,init)=>init(child)},{enabled:()=>enabled,map:async paths=>{if(enabled)calls.push(...paths)}})
+  listenForTaskFiles({on,inject:(_deps,init)=>init(child)},{enabled:()=>enabled,map:async paths=>{if(enabled)calls.push(...paths)},changed:async paths=>updates.push(...paths)})
   const emit=async(name,...args)=>{for(const listener of listeners.get(name))await listener(...args)}
   const source=join(tmpdir(),'kept.txt')
   const policy={kind:'createIfAbsent'}
@@ -86,6 +86,14 @@ test('successful file creation, deliveries and new workspace files trigger mappi
   enabled=false
   await emit('session/event',session,{type:'deliverables/presented',data:{files:[{path:source}]}})
   assert.equal(calls.length,3)
+  const beforeUpdates=updates.length
+  await listeners.get('fs/write-intent')[0](source,actor,async()=>({kind:'replace'}))
+  await emit('fs/observed',source,{kind:'present'},actor)
+  await emit('session/event',session,{type:'turn/start',data:{turn:2}})
+  await emit('session/event',session,{type:'workspace/changes',seq:13,data:{turn:2}})
+  await new Promise(resolve=>setImmediate(resolve))
+  assert.ok(updates.length>beforeUpdates,'existing files receive source updates with auto mapping disabled')
+  assert.equal(calls.length,3,'notification does not re-enable automatic mapping')
 })
 
 test('composer picker gates search and original bytes and indexes a mapped folder on demand',async t=>{

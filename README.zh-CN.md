@@ -55,9 +55,9 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 请帮我在当前 DSH 桌面端安装「MOKI资料库」插件，完成下载、安装和版本验证。
 
 仓库：https://github.com/JKZeng-cell/moki-library-for-dsh
-版本：0.1.71
-安装包：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.71/dsh-moki-library-0.1.71.tgz
-校验清单（SHA256）：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.71/SHA256SUMS.txt
+版本：0.1.72
+安装包：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.72/dsh-moki-library-0.1.72.tgz
+校验清单（SHA256）：https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.72/SHA256SUMS.txt
 
 请依次执行：
 1. 检查当前系统、DSH 版本和它使用的 Node.js。插件要求 DSH >=0.2.2-rc.1 <0.3.0、Node.js >=22.19，主要验证环境为 Windows 桌面端。
@@ -67,7 +67,7 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
    dsh plugin --profile desktop add "dsh-moki-library@file:<安装包绝对路径>" --allow-build=sharp
 5. 执行版本检查：
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   以命令结果确认安装到 desktop 的版本为 0.1.71（或原有的更新版本）。保留现有插件、配置和资料库数据。
+   以命令结果确认安装到 desktop 的版本为 0.1.72（或原有的更新版本）。保留现有插件、配置和资料库数据。
 6. 汇报安装包位置、实际使用的 CLI、配置和版本检查结果，再提醒我保存工作、手动完全退出并重新打开 DSH。安装任务进行中请保持当前 DSH 会话运行。
 
 如果当前会话不能下载或执行终端、环境不兼容，或安装失败，请说明具体原因和下一步操作，安装状态以实际命令结果为准。
@@ -81,12 +81,12 @@ MOKI 资料库是为 **DeepSeek Harness（DSH）** 开发的社区插件。管�
 
 ### 方式二：在终端手动安装
 
-1. 先启动一次 DSH 桌面端完成配置初始化，再完全退出。在 [Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.71) 下载 `dsh-moki-library-0.1.71.tgz`。
+1. 先启动一次 DSH 桌面端完成配置初始化，再完全退出。在 [Release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.72) 下载 `dsh-moki-library-0.1.72.tgz`。
 2. 在 PowerShell 中把前两行替换为实际路径，再执行安装。若桌面端使用了自定义 `DSH_HOME`，终端也要沿用同一个值。
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.71.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.72.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -116,6 +116,8 @@ GitHub 的 Source code 压缩包用于开发；`.tgz` Release 资产是可安装
 HTML 渲染预览也支持选中文字 → 小鲸鱼 → 输入指令（可附带附件）。选区同时保留元素位置和源码映射，相同文字出现多次时只改选中位置；跨行内标签的文字可替换，原有标签与选区外内容保持不变。文字替换会转义 HTML 字符，不把输入作为可执行代码。需要改样式或结构时可切换到源码。HTML 预览中的脚本仍禁用。
 
 ### 先审阅，再保存
+
+文件顶部的 **刷新预览** 可重新读取原文件。有未保存草稿时，可选择继续编辑、保存并刷新或放弃草稿并刷新；待确认的 AI 修改仍需先审阅。DSH 写入原文件与更新草稿分开处理，已保存的相同内容会直接同步保存状态，不再重复覆盖。文本/HTML 会在核对原始版本后合并严格分离的改动，同一位置的不同修改仍保留冲突保护。Office 保存以文件内容核对版本，不再仅依赖修改时间，并在导出结束后再次检查原文件。
 
 文本、Word、Excel 和 PPT 的 AI 修改会高亮显示，审阅栏可展开查看位置和修改前后内容。高亮是临时提示，不会写入文件格式。**采纳会将当前结果保存到原文件，不刷新或退出编辑器。** 当前幻灯片、工作表、选区和浏览位置保持不变；保存失败时仍保留待确认修改，方便重试。
 

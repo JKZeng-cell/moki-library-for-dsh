@@ -32,6 +32,7 @@ import {
   Pencil,
   Play,
   RotateCcw,
+  RefreshCw,
   ScanText,
   Scan,
   Save,
@@ -414,7 +415,7 @@ export function isUniverInsertableLibraryImage(item: ResourceLibraryItem): boole
   return isUniverLibraryImageName(item.target || item.name);
 }
 
-type EditorExitIntent = "close" | "cancel";
+type EditorExitIntent = "close" | "cancel" | "refresh";
 
 function editableCaretPosition(element: HTMLInputElement | HTMLTextAreaElement): { x: number; y: number } {
   const bounds = element.getBoundingClientRect();
@@ -464,25 +465,26 @@ function contentEditableCaretPosition(element: HTMLElement): { x: number; y: num
 }
 
 export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, layerClassName = "z-[80]", displayMode = "modal", contained = false, onDirtyChange, active = true, onCheckpointReady, onCloseRequestReady, headerActions, resumeOffice }: Props) {
-  const fileState=useFilePreviewInfo(item),info=fileState?.info;
+  const [previewRevision,setPreviewRevision]=useState(0);
+  const fileState=useFilePreviewInfo(item,previewRevision),info=fileState?.info;
   const [compatibleMedia,setCompatibleMedia]=useState(false);
   const extension = info?.extension ?? resourcePreviewExtension(item);
   const originalKind = enhancedResourcePreviewKind(item);
   const kind:PreviewKind = item.kind!=='local_file'?originalKind:!fileState?'pending':
     info?.textPaged || ['archive','model','font','ofd','moki'].includes(info?.kind??'')?'extra':
     info && ['image','video','audio','embedded'].includes(info.kind)?info.kind as PreviewKind:originalKind;
-  const previewUrl = compatibleMedia ? panelUrl(`/api/library/items/${item.id}/preview-media`) : info?.converted ? panelUrl(`/api/library/items/${item.id}/preview-image`) : resourceLibraryPreviewUrl(item);
+  const sourcePreviewUrl = compatibleMedia ? panelUrl(`/api/library/items/${item.id}/preview-media`) : info?.converted ? panelUrl(`/api/library/items/${item.id}/preview-image`) : resourceLibraryPreviewUrl(item);
+  const previewUrl=sourcePreviewUrl&&item.kind==='local_file'&&previewRevision ? sourcePreviewUrl+(sourcePreviewUrl.includes('?')?'&':'?')+'refresh='+previewRevision : sourcePreviewUrl;
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [textContent, setTextContent] = useState("");
   const [textSourceVersion, setTextSourceVersion] = useState<string>();
   const [savedTextContent, setSavedTextContent] = useState("");
+  const textSyncState=useRef({textContent,savedTextContent});textSyncState.current={textContent,savedTextContent};
   const [editingText, setEditingText] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [exitIntent, setExitIntent] = useState<EditorExitIntent>();
-  const textDraftActiveRef = useRef(false);
-  textDraftActiveRef.current = editingText || dirty;
   const [textHistory, setTextHistory] = useState<{undo:string[];redo:string[]}>({undo:[],redo:[]});
   const [textReviews,setTextReviews]=useState<TextReview[]>([]);
   const textReviewSequence=useRef(0);
@@ -681,11 +683,12 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     try {
       if(editingText) {
         const latest=textReviews.at(-1);if(latest?.id!==expectedId)throw new Error(uiText('待确认版本已变化，请查看最新修改后再操作'));
-        const content=action==='reject'?latest.before:textContent;
+        let content=action==='reject'?latest.before:textContent;
         const entries=action==='reject'?textReviews.slice(0,-1):[];
         if(action==='accept'){
           await autosavePending.current.catch(()=>undefined);
-          const saved=await saveResourceLibraryTextContent(item.id,content,textSourceVersion);
+          const saved=await saveResourceLibraryTextContent(item.id,content,textSourceVersion,savedTextContent);
+          content=saved.content??content;
           setTextSourceVersion(saved.version);setSavedTextContent(content);
           checkpointState.current={...checkpointState.current,textContent:content,textSourceVersion:saved.version,review:[],dirty:false};
           lastTextCheckpoint.current=JSON.stringify([content,saved.version,[]]);
@@ -785,6 +788,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
 
   useEffect(() => {
     setNotice("");
+    setLoading(false);
     setCompatibleMedia(false);
     setTextContent("");
     setTextHistory({undo:[],redo:[]});
@@ -803,7 +807,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     if (previousUniverSession) {
       void discardOfficeSession(previousUniverSession).catch(() => undefined);
     }
-    setOfficeRevision("");
+    setOfficeRevision(previewRevision?String(previewRevision):"");
     acceptedOfficeRevision.current="";
     setPdfTextOpen(false);
     setOcrProgress(undefined);
@@ -856,57 +860,53 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       .catch((error) => { if (!cancelled) setNotice(error instanceof Error ? error.message : uiText("文本读取失败")); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [extension, item.id, kind]);
+  }, [extension, item.id, kind, previewRevision]);
 
   useEffect(() => { onDirtyChangeRef.current?.(dirty); }, [dirty]);
   useEffect(() => () => onDirtyChangeRef.current?.(false), []);
 
   useEffect(() => {
     let cancelled = false;
+    let syncSequence = 0;
     const handleUpdate = (event: Event) => {
       const detail = (event as CustomEvent<WorkbenchDataUpdatedDetail>).detail;
       if ((!mokiAssistancePendingRef.current && !embedded) || detail?.resource !== "resource_library" || detail.itemId !== item.id) return;
       mokiAssistancePendingRef.current = false;
+      if(checkpointState.current.saving)return;
+      const sequence=++syncSequence;
       const activeSession = univerSessionRef.current;
+      if(detail.operation==='office-draft') {
+        if(activeSession)void refreshReviewRef.current().catch(()=>undefined);
+        return;
+      }
       if (activeSession) {
-        setDirty(true);
-        setAutosaveStatus("");
-        setNotice(uiText("DSH 已更新草稿"));
+        // A source-file write does not dirty the independent Office worktree.
+        setNotice(uiText('原文件已更新，点击刷新查看；当前草稿仍保留'));
         return;
       }
-      if (kind === "text" && textDraftActiveRef.current) {
-        setNotice(uiText("原文件已更新，当前编辑草稿已保留。保存前请核对最新文件，或将草稿另存为。"));
-        return;
-      }
-      setLoading(true);
       if (kind === "text") {
         void getResourceLibraryTextContent(item.id)
           .then((result) => {
-            if (cancelled || textDraftActiveRef.current) return;
+            if (cancelled || sequence!==syncSequence || checkpointState.current.saving) return;
+            const current=textSyncState.current,review=checkpointState.current.review;
+            if(current.textContent!==result.content && (current.textContent!==current.savedTextContent || review.length)) {
+              setNotice(uiText('原文件已更新，点击刷新查看；当前草稿仍保留'));return;
+            }
             setTextContent(result.content);
             setSavedTextContent(result.content);
             setTextSourceVersion(result.version);
             setDirty(false);
-            setNotice(uiText("已同步 DSH 的编辑结果"));
+            checkpointState.current={...checkpointState.current,textContent:result.content,textSourceVersion:result.version,dirty:false};
+            setNotice(uiText('文件已由其他操作保存，已读取最新内容'));
           })
-          .catch((error) => setNotice(error instanceof Error ? error.message : uiText("DSH 编辑结果同步失败")))
-          .finally(() => setLoading(false));
+          .catch((error) => {if(!cancelled)setNotice(error instanceof Error ? error.message : uiText("DSH 编辑结果同步失败"));});
         return;
       }
-      void getResourceLibraryStructuredPreview(item.id)
-        .then((result) => {
-          setStructuredPreview(result);
-          setSavedStructuredPreview(structuredClone(result));
-          setDirty(false);
-          setOfficeRevision(new Date().toISOString());
-          setNotice(uiText("已同步 DSH 的编辑结果"));
-        })
-        .catch((error) => setNotice(error instanceof Error ? error.message : uiText("DSH 编辑结果同步失败")))
-        .finally(() => setLoading(false));
+      if(!checkpointState.current.dirty)reloadPreview();
     };
     window.addEventListener(WORKBENCH_DATA_UPDATED_EVENT, handleUpdate);
     return () => { cancelled = true; window.removeEventListener(WORKBENCH_DATA_UPDATED_EVENT, handleUpdate); };
-  }, [embedded, item.id, kind]);
+  }, [embedded, item.id, kind,previewRevision]);
 
   function loadPresentationFallback(): void {
     if (!["ppt", "pptx"].includes(extension) || presentationFallbackRequestedRef.current) return;
@@ -1053,18 +1053,19 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     setNotice("");
     try {
       await autosavePending.current.catch(()=>undefined);
-      const saved = await saveResourceLibraryTextContent(item.id, textContent, textSourceVersion);
+      const saved = await saveResourceLibraryTextContent(item.id, textContent, textSourceVersion, savedTextContent);
+      const content=saved.content??textContent;
       await draftRequest('draft','DELETE');
       lastTextCheckpoint.current='';
       setAutosaveStatus('');
-      checkpointState.current={...checkpointState.current,textContent,editingText:false,dirty:false,saving:false};
+      checkpointState.current={...checkpointState.current,textContent:content,textSourceVersion:saved.version,editingText:false,dirty:false,saving:false};
       setTextSourceVersion(saved.version);
-      setSavedTextContent(textContent);
+      setTextContent(content);setSavedTextContent(content);
       setTextHistory({undo:[],redo:[]});
       setDirty(false);
       setEditingText(false);
       finishMokiEditorAssistance();
-      setNotice(uiText("已保存到原文件"));
+      setNotice(uiText(saved.reconciled?'已同步最新文件并保存草稿':saved.unchanged?'文件已保存，已同步保存状态':'已保存到原文件'));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : uiText("文本保存失败"));
       if (propagate) throw error;
@@ -1299,7 +1300,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       setDirty(false);
       setOfficeRevision(result.updatedAt);
       acceptedOfficeRevision.current="";
-      setNotice(kind === "workspace" ? uiText("已确认合并 Univer 草稿，并原子保存到原生工作区文件") : uiText("已确认合并 Univer 草稿，并原子保存到原 Office 文件"));
+      setNotice(result.sourceUpdated?uiText('文件已由其他操作保存，已读取最新内容'):result.unchanged?uiText('文件已保存，已同步保存状态'):kind === "workspace" ? uiText("已确认合并 Univer 草稿，并原子保存到原生工作区文件") : uiText("已确认合并 Univer 草稿，并原子保存到原 Office 文件"));
       // The save response is authoritative. Rebuilding the read-only preview
       // can take much longer for rich Word files, so it must not keep the Save
       // button spinning after the source file has already been written.
@@ -1401,14 +1402,15 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       }
       setExitIntent(undefined);
       if (intent === "close") onClose();
+      else if(intent==='refresh')reloadPreview();
     } catch {
       // The save/discard routine keeps the error visible and the prompt open.
     }
   }
 
   async function requestEditorExit(intent: EditorExitIntent) {
-    if (saving) return;
-    if (dirty) {
+    if (saving || reviewBusy) return;
+    if (dirty || pendingReviews) {
       setExitIntent(intent);
       return;
     }
@@ -1416,9 +1418,16 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       if (editingOffice) await cancelOfficeEditing(true);
       else if (editingText) await discardTextDraft(true);
       if (intent === "close") onClose();
+      else if(intent==='refresh')reloadPreview();
     } catch {
       // Keep the editor open when its recoverable draft cannot be cleaned up.
     }
+  }
+
+  function reloadPreview() {
+    selectedPreview.current={};window.getSelection()?.removeAllRanges();clearWorkbenchSelectionContext('library');
+    setAutosaveStatus('');lastTextCheckpoint.current='';setSelectingRegion(false);
+    setPreviewRevision(value=>Math.max(Date.now(),value+1));
   }
   const requestEditorExitRef = useRef(requestEditorExit);
   useEffect(() => {
@@ -1870,6 +1879,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
         </div>
         <div className="resource-preview-actions dsh-file-actions" role="toolbar" aria-label={uiText("文件操作")}>
           {headerActions}
+          <IconButton aria-label={uiText('刷新预览')} title={uiText('刷新预览')} disabled={loading||saving||reviewBusy} onClick={()=>void requestEditorExit('refresh')}><RefreshCw size={14} className={loading?'animate-spin':undefined}/></IconButton>
           {htmlPreview&&<Button size="compact" variant={selectingRegion?'primary':'secondary'} aria-label={uiText('选区模式')} aria-pressed={selectingRegion} title={uiText('悬停识别模块，点击选中 · Alt+↑ 选择上级 · Esc 清除')} onClick={()=>setSelectingRegion(!selectingRegion)}><Scan size={15}/>{uiText('选区模式')}</Button>}
           {!editingOffice&&(['image','video'].includes(kind)||kind==='embedded'&&extension==='pdf'||['model','ofd'].includes(info?.kind||''))&&<IconButton aria-label={uiText("框选区域与 DSH 协作")} title={uiText("框选预览区域与 DSH 协作")} aria-pressed={selectingRegion} onClick={()=>setSelectingRegion(!selectingRegion)}><Scan size={15}/></IconButton>}
           <Button size="compact" className="dsh-compact-action" data-dsh-chat-trigger="true" aria-label={uiText("DSH 对话")} aria-keyshortcuts="Alt+D" title={uiText("与 DSH 对话 (Alt+D)")} onMouseDown={event => event.preventDefault()} onClick={async () => {
@@ -1916,16 +1926,16 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       <EditReviewBar entries={reviewEntries} busy={reviewBusy} status={reviewResolving?(saving?uiText('正在保存…'):uiText('正在取消修改…')):undefined} onResolve={(action,id)=>void resolveEditReview(action,id)} onLocate={locateReview}/>
       {exitIntent ? <LibraryDialog titleId="library-save-title" size="small" onDismiss={()=>{if (!saving) setExitIntent(undefined);}}>
         <section className="library-dialog-card">
-          <header><h3 id="library-save-title">{uiText("保存对“")}{item.name}{uiText("”的修改？")}</h3></header>
-          <p className="library-dialog-body">{uiText("当前修改还在草稿中。")}</p>
+          <header><h3 id="library-save-title">{exitIntent==='refresh'?uiText('刷新前处理当前草稿'):uiText("保存对“")+item.name+uiText("”的修改？")}</h3></header>
+          <p className="library-dialog-body">{uiText(exitIntent==='refresh'?'刷新将重新读取原文件。可以先保存草稿，或放弃草稿查看最新文件。':'当前修改还在草稿中。')}{Boolean(pendingReviews)&&uiText('请先采纳或取消 AI 修改，再保存文件')}</p>
           <footer>
             <Button size="compact" autoFocus disabled={saving} onClick={() => setExitIntent(undefined)}>{uiText("继续编辑")}</Button>
-            <Button size="compact" variant="danger" disabled={saving} onClick={() => void completeEditorExit("discard")}>{uiText("放弃修改")}</Button>
-            <Button size="compact" variant="primary" disabled={saving} onClick={() => void completeEditorExit("save")}>{saving ? <LoaderCircle size={13} className="animate-spin"/> : <Save size={13}/>}{uiText("保存并退出")}</Button>
+            <Button size="compact" variant="danger" disabled={saving} onClick={() => void completeEditorExit("discard")}>{uiText(exitIntent==='refresh'?'放弃草稿并刷新':'放弃修改')}</Button>
+            <Button size="compact" variant="primary" disabled={saving||Boolean(pendingReviews)||reviewBusy} onClick={() => void completeEditorExit("save")}>{saving ? <LoaderCircle size={13} className="animate-spin"/> : <Save size={13}/>}{uiText(exitIntent==='refresh'?'保存并刷新':'保存并退出')}</Button>
           </footer>
         </section>
       </LibraryDialog> : null}
-      <div className="dsh-preview-content relative min-h-0 flex-1 overflow-hidden" data-preview-kind={kind} data-extension={extension}>
+      <div key={previewRevision} className="dsh-preview-content relative min-h-0 flex-1 overflow-hidden" data-preview-kind={kind} data-extension={extension}>
         {selectingRegion&&!htmlPreview&&kind!=='text'&&<PreviewRegionSelection onCancel={()=>setSelectingRegion(false)} onSelect={rect=>{
           try{const root=previewContent(),snapshot=root&&capturePreviewVisual(root,rect);if(!snapshot){setNotice(uiText("请在预览画面内框选"));return}rememberSnapshot(snapshot);window.getSelection()?.removeAllRanges();setSelectingRegion(false);askMokiToEdit()}catch{setSelectingRegion(false);setNotice(uiText("当前画面无法读取，请使用文字选区协作"))}
         }}/>}

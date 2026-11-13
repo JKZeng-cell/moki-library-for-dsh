@@ -6,13 +6,13 @@ import './resource-extra-preview.css';
 const ModelPreview=lazy(()=>import('./resource-model-preview.js'));
 const OfdPreview=lazy(()=>import('./resource-ofd-preview.js'));
 export type PreviewInfo={extension:string;size:number;mime:string;kind:string;converted:boolean;textPaged:boolean;modified:string;detected:boolean};
-export function useFilePreviewInfo(item:{id:string;kind:string;updatedAt?:string}){
+export function useFilePreviewInfo(item:{id:string;kind:string;updatedAt?:string},revision=0){
   const [state,setState]=useState<{id:string;info?:PreviewInfo;error?:string}>();
   useEffect(()=>{
     if(item.kind!=='local_file')return;const abort=new AbortController();
     fetch(panelUrl(`/api/library/items/${item.id}/preview-info`),{signal:abort.signal}).then(async r=>{const info=await r.json();if(!r.ok)throw Error(info.error);setState({id:item.id,info})}).catch(e=>{if(!abort.signal.aborted)setState({id:item.id,error:e.message})});
     return()=>abort.abort();
-  },[item.id,item.updatedAt,item.kind]);
+  },[item.id,item.updatedAt,item.kind,revision]);
   return state?.id===item.id?state:undefined;
 }
 async function json(url:string,signal:AbortSignal){const r=await fetch(url,{signal}),v=await r.json();if(!r.ok)throw Error(v.error||uiText("预览读取失败"));return v}

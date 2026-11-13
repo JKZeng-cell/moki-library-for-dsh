@@ -8,6 +8,17 @@ export type OfficeQualityReport = {
   limitations: string[];
 };
 const mainParts: Record<string, string> = { '.docx': 'word/document.xml', '.xlsx': 'xl/workbook.xml', '.pptx': 'ppt/presentation.xml' };
+// ZIP timestamps and compression are container details. Every document part,
+// including styles, media and metadata, must match before calling it saved.
+export function sameOfficeContents(a:Buffer,b:Buffer,extension:string):boolean {
+  if(a.equals(b))return true;
+  if(!mainParts[extension.toLowerCase()])return false;
+  try {
+    const left=unzipSync(a),right=unzipSync(b);
+    const keys=Object.keys(left).filter(key=>!key.endsWith('/'));
+    return keys.length===Object.keys(right).filter(key=>!key.endsWith('/')).length && keys.every(key=>right[key]&&Buffer.from(left[key]!).equals(Buffer.from(right[key]!)));
+  }catch{return false;}
+}
 const attribute = (xml: string, name: string) => new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, 'u').exec(xml)?.[1];
 const decode = (value: string) => value.replace(/&amp;/gu, '&').replace(/&quot;/gu, '"').replace(/&apos;/gu, "'").replace(/&lt;/gu, '<').replace(/&gt;/gu, '>');
 

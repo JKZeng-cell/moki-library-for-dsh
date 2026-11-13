@@ -855,5 +855,14 @@
   "添加到": "Add to",
   "返回": "Back",
   "正在创建…": "Creating…",
-  "创建并进入": "Create and open"
+  "创建并进入": "Create and open",
+  "刷新预览": "Refresh preview",
+  "刷新前处理当前草稿": "Review your draft before refreshing",
+  "刷新将重新读取原文件。可以先保存草稿，或放弃草稿查看最新文件。": "Refresh reloads the original file. Save your draft first, or discard it to view the latest file.",
+  "放弃草稿并刷新": "Discard and refresh",
+  "保存并刷新": "Save and refresh",
+  "已同步最新文件并保存草稿": "Latest file synced and draft saved",
+  "文件已保存，已同步保存状态": "File already saved. Save status synced.",
+  "文件已由其他操作保存，已读取最新内容": "File saved elsewhere. Latest content loaded.",
+  "原文件已更新，点击刷新查看；当前草稿仍保留": "Original file updated. Refresh to view it; your draft is preserved."
 }

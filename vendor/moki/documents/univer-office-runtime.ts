@@ -2,8 +2,8 @@ import { EditorDraftStore } from "./editor-draft-store.js";
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { officeChanges } from '../../../src/edit-review.js';
-import { assertOfficeExport, inspectOfficeQuality } from './office-quality.js';
-import { withFileEdit } from "./file-edit-guard.js";
+import { assertOfficeExport, inspectOfficeQuality, sameOfficeContents } from './office-quality.js';
+import { withFileEdit, fileVersion, fileContentVersion, FileEditConflict } from "./file-edit-guard.js";
 import { randomUUID, createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
@@ -270,6 +270,8 @@ type RuntimeSession = UniverOfficeSession & {
   sourceFormat: "office" | "univer";
   sourceSize: number;
   sourceModifiedMs: number;
+  sourceVersion?:string;
+  baselineHeads?:string;
   merged: boolean;
   hasChanges: boolean;
   review?: { entries: OfficeReviewEntry[]; sequence: number; baselineFile?:string };
@@ -450,6 +452,7 @@ export class UniverOfficeRuntime {
     }
     const stored = await this.draftStore().get('office:'+itemId);
     const recovery = stored?.sourcePath === canonicalSource ? stored : undefined;
+    const sourceVersion = recovery ? recovery.sourceVersion : await fileVersion(canonicalSource);
     let importSource = canonicalSource;
     if (recovery) {
       const restoreDirectory = join(this.stateDirectory, 'office-recovery', randomUUID());
@@ -461,6 +464,9 @@ export class UniverOfficeRuntime {
       const opened = await this.openNative(itemId, importSource, recovery?.sourceSize ?? source.size, recovery?.sourceModifiedMs ?? source.mtimeMs, displayName, recovery?.nativeWorktreeId);
       const restored = this.requireSession(opened.sessionId);
       restored.sourcePath = canonicalSource;
+      restored.sourceVersion = sourceVersion;
+      restored.baselineHeads = recovery ? recovery.baselineHeads : await this.reviewHeads(restored);
+      if(!recovery && await fileVersion(canonicalSource)!==sourceVersion){this.sessions.delete(opened.sessionId);throw new FileEditConflict();}
       if (extname(canonicalSource).toLowerCase() !== '.univer') {
         Object.assign(restored, univerOfficeFileType(canonicalSource), {sourceFormat:'office'});
       }
@@ -558,10 +564,13 @@ return { applied };`,
         univerPath,
         sourceSize: recovery?.sourceSize ?? source.size,
         sourceModifiedMs: recovery?.sourceModifiedMs ?? source.mtimeMs,
+        sourceVersion,
         merged: false,
         hasChanges: Boolean(recovery),
       };
       this.sessions.set(sessionId, session);
+      session.baselineHeads = recovery ? recovery.baselineHeads : await this.reviewHeads(session);
+      if(!recovery && await fileVersion(canonicalSource)!==sourceVersion)throw new FileEditConflict();
       return {
         sessionId: session.sessionId,
         itemId: session.itemId,
@@ -575,6 +584,7 @@ return { applied };`,
     } catch (error) {
       // The Gateway may still hold document.univer on Windows after a failed
       // import. Cleanup must not replace the import error with an EBUSY error.
+      this.sessions.delete(sessionId);
       await rm(sessionDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined);
       throw error;
     }
@@ -839,7 +849,7 @@ return { applied };`,
       const exported=native?{path:join(session.workspace,randomUUID()+'.univer')}:await this.exportDraftInSession(sessionId,session.itemId);
       if(native)await this.copyReviewSnapshot(session.univerPath,exported.path);
       try {return await this.draftStore().put('office:'+session.itemId,await readFile(exported.path),{
-        sourcePath:session.sourcePath,sourceSize:session.sourceSize,sourceModifiedMs:session.sourceModifiedMs,
+        sourcePath:session.sourcePath,sourceSize:session.sourceSize,sourceModifiedMs:session.sourceModifiedMs,sourceVersion:session.sourceVersion,baselineHeads:session.baselineHeads,
         ...(session.sourceFormat==='univer'||native?{nativeWorktreeId:session.worktreeId}:{}),
         ...(session.review?{review:session.review}:{}),
       });} finally {await rm(exported.path,{force:true});}
@@ -852,10 +862,10 @@ return { applied };`,
     if(session.review)await this.removeReviewFiles([...session.review.entries.map(entry=>entry.snapshot),...(session.review.baselineFile?[session.review.baselineFile]:[])]);
   }
 
-  private async finishSavedSession(session:RuntimeSession,keepSession=false) {
+  private async finishSavedSession(session:RuntimeSession,keepSession=false,knownVersion?:string) {
     const saved=await stat(session.sourcePath);
     if(keepSession){
-      Object.assign(session,{sourceSize:saved.size,sourceModifiedMs:saved.mtimeMs,hasChanges:false});
+      Object.assign(session,{sourceSize:saved.size,sourceModifiedMs:saved.mtimeMs,sourceVersion:knownVersion??await fileVersion(session.sourcePath),baselineHeads:await this.reviewHeads(session),hasChanges:false});
       // The original is already committed. If deleting the recovery draft
       // fails, replace it with the accepted baseline rather than roll back the
       // review decision or make the next save conflict with our own write.
@@ -868,29 +878,43 @@ return { applied };`,
     return {size:saved.size,updatedAt:saved.mtime.toISOString()};
   }
 
-  async save(sessionId: string, itemId?: string, options:{keepSession?:boolean}={}): Promise<{ size: number; updatedAt: string }> {
+  async save(sessionId: string, itemId?: string, options:{keepSession?:boolean}={}): Promise<{ size: number; updatedAt: string; unchanged?:boolean; sourceUpdated?:boolean }> {
     return this.inSession(sessionId, async () => {
       const session = this.requireSession(sessionId, itemId);
       this.assertReviewed(session);
-      return withFileEdit(session.sourcePath, undefined, async () => {
-        await this.assertSourceUnchanged(session);
+      return withFileEdit(session.sourcePath, undefined, async (original) => {
+        const originalVersion=fileContentVersion(original);
+        const metadata=await stat(session.sourcePath);
+        const sourceChanged=session.sourceVersion ? originalVersion!==session.sourceVersion
+          : metadata.size!==session.sourceSize || metadata.mtimeMs!==session.sourceModifiedMs;
+        if(sourceChanged && !options.keepSession && session.baselineHeads && session.baselineHeads===await this.reviewHeads(session)) {
+          // The source was saved elsewhere; an untouched editor has nothing to
+          // overwrite. Finish it and let the preview read the latest source.
+          return {...await this.finishSavedSession(session),unchanged:true,sourceUpdated:true};
+        }
+        const commit=async(contents:Buffer)=>{
+          const unchanged=original.equals(contents) || sourceChanged&&sameOfficeContents(original,contents,extname(session.sourcePath));
+          if(sourceChanged&&!unchanged)throw new FileEditConflict();
+          // Export may take seconds. Detect external writes that happened while
+          // it ran rather than replacing the newly saved file with old content.
+          if(await fileVersion(session.sourcePath)!==originalVersion)throw new FileEditConflict();
+          if(!unchanged)await replaceFileAtomically(session.sourcePath,contents);
+          return {...await this.finishSavedSession(session,options.keepSession,unchanged?originalVersion:fileContentVersion(contents)),unchanged};
+        };
         if (session.sourceFormat === "univer") {
           // Merge a copy for the saved native file; the visible worktree keeps
           // its identity and can continue receiving manual or AI edits.
-          let copy:RuntimeSession|undefined;
-          if(options.keepSession){
-            // Keep the SQLite backup path shallow for Windows path limits.
-            const directory=join(this.stateDirectory,'univer-save',randomUUID());await mkdir(directory,{recursive:true});
-            const workspace=await realpath(directory);
-            copy={...session,workspace,univerPath:join(workspace,'document.univer')};
-            await this.copyReviewSnapshot(session.univerPath,copy.univerPath);
-          }
+          // Never retire the visible worktree before the source write succeeds.
+          // Keep the SQLite backup path shallow for Windows path limits.
+          const directory=join(this.stateDirectory,'univer-save',randomUUID());await mkdir(directory,{recursive:true});
+          const workspace=await realpath(directory);
+          const copy={...session,workspace,univerPath:join(workspace,'document.univer')};
+          await this.copyReviewSnapshot(session.univerPath,copy.univerPath);
           let contents:Buffer;
-          try {await this.mergeSessionWorktree(copy??session);contents=await readFile((copy??session).univerPath);}
-          finally {if(copy)await rm(copy.workspace,{recursive:true,force:true,maxRetries:5,retryDelay:100}).catch(()=>undefined);}
+          try {await this.mergeSessionWorktree(copy);contents=await readFile(copy.univerPath);}
+          finally {await rm(copy.workspace,{recursive:true,force:true,maxRetries:5,retryDelay:100}).catch(()=>undefined);}
           if (!contents.length) throw new Error("Univer 工作区文件为空");
-          await replaceFileAtomically(session.sourcePath, contents);
-          return this.finishSavedSession(session,options.keepSession);
+          return commit(contents);
         }
         const extension = extname(session.sourcePath);
         const documentBorders = extension.toLowerCase() === ".docx"
@@ -906,11 +930,10 @@ return { applied };`,
             exported = preserveUniverDocumentParagraphBorders(exported, documentBorders);
           }
           assertOfficeExport(exported, extension);
-          await replaceFileAtomically(session.sourcePath, exported);
+          return await commit(exported);
         } finally {
           await rm(exportedPath, { force: true }).catch(()=>undefined);
         }
-        return this.finishSavedSession(session,options.keepSession);
       });
     });
   }
@@ -970,13 +993,6 @@ return { applied };`,
       const saved = await stat(resolvedDestination);
       return { path: resolvedDestination, size: saved.size, updatedAt: saved.mtime.toISOString() };
     });
-  }
-
-  private async assertSourceUnchanged(session: RuntimeSession): Promise<void> {
-    const current = await stat(session.sourcePath);
-    if (current.size !== session.sourceSize || current.mtimeMs !== session.sourceModifiedMs) {
-      throw new Error("原 Office 文件在编辑期间已被其他程序修改，草稿仍保留；可另存当前草稿，或读取最新原文件后合并修改");
-    }
   }
 
   private async exportOfficeFile(session: RuntimeSession, output: string, outputWorkspace: string): Promise<Buffer> {

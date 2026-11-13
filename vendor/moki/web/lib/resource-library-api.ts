@@ -11,6 +11,7 @@ import type {
 } from "../../shared/resource-library-contract.js";
 import type { AssistantImageAttachment } from "../../shared/assistant-contract.js";
 import { apiFetch, panelUrl } from "./api-fetch.js";
+import { saveTextContent, type TextContentSaveResult } from "./text-content-save.js";
 
 export async function copyLibraryFile(ids: string[]): Promise<void> {
   const response = await apiFetch('/api/dsh/copy-file', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ids})});
@@ -475,14 +476,9 @@ export async function getResourceLibraryTextContent(id: string): Promise<Resourc
   return response.json() as Promise<ResourceLibraryTextContent>;
 }
 
-export async function saveResourceLibraryTextContent(id: string, content: string, expectedVersion?: string, baseContent?: string): Promise<{ saved: true; version?: string; size: number; updatedAt: string; content?:string; reconciled?:boolean; unchanged?:boolean }> {
-  const response = await apiFetch(`/api/library/items/${encodeURIComponent(id)}/content`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content, expectedVersion, baseContent }),
-  });
-  if (!response.ok) throw new Error(await errorMessage(response, uiText("资料文本保存失败")));
-  return response.json() as Promise<{ saved: true; version?: string; size: number; updatedAt: string }>;
+export async function saveResourceLibraryTextContent(id: string, content: string, expectedVersion?: string, baseContent?: string): Promise<TextContentSaveResult> {
+  return saveTextContent(apiFetch, `/api/library/items/${encodeURIComponent(id)}/content`,
+    { content, expectedVersion, baseContent }, uiText("资料文本保存失败"));
 }
 
 export function resourceLibraryPreviewUrl(item: ResourceLibraryItem): string | undefined {

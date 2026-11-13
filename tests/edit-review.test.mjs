@@ -88,6 +88,14 @@ test('Office review stack preserves manual baseline, cancels only latest, surviv
     await office.resolveReview(session.sessionId,item.id,'reject',first.review.id)
     assert.equal((await exec('return '+spec.read)).value,manual)
     assert.deepEqual(await readFile(item.target),original)
+    const allFirst=await review(spec.write('ALL-ONE'))
+    const allSecond=await review(spec.write('ALL-TWO'))
+    await assert.rejects(office.resolveReview(session.sessionId,item.id,'reject_all',allFirst.review.id),/版本已变化/)
+    assert.equal(office.reviewStatus(session.sessionId,item.id).entries.length,2)
+    const rolledBack=await runtime.api(chat,'POST',`/api/library/items/${item.id}/univer-session/${session.sessionId}/review`,{action:'reject_all',expectedId:allSecond.review.id})
+    assert.equal(rolledBack.entries.length,0);assert.equal(rolledBack.highlights.length,0)
+    assert.equal((await exec('return '+spec.read)).value,manual,'discard all must preserve manual edits preceding the first AI edit')
+    assert.deepEqual(await readFile(item.target),original,'discard all never rewrites the original file')
     const third=await review(spec.write('ACCEPTED'))
     await office.resolveReview(session.sessionId,item.id,'accept',third.review.id)
     assert.equal(office.reviewStatus(session.sessionId,item.id).entries.length,0)
@@ -117,7 +125,7 @@ test('Office review stack preserves manual baseline, cancels only latest, surviv
   assert.equal(latest.entries.length,2);assert.equal(latest.highlights.find(c=>c.range==='A2').before,'1');assert.equal(latest.highlights.find(c=>c.range==='A2').after,'20')
   const checkpoint=recoveredOffice.checkpoint.bind(recoveredOffice)
   recoveredOffice.checkpoint=async()=>{throw new Error('Simulated draft persistence failure')}
-  for(const action of ['accept','reject']) {
+  for(const action of ['accept','reject','reject_all']) {
     await assert.rejects(recoveredOffice.resolveReview(recovered.sessionId,item.id,action,next.value.review.id),/persistence failure/)
     assert.equal(recoveredOffice.reviewStatus(recovered.sessionId,item.id).entries.at(-1).id,next.value.review.id)
     assert.equal((await recoveredOffice.execute(recovered.sessionId,item.id,"return univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2').getValue()",recovered.unitId)).value,20)
@@ -125,6 +133,7 @@ test('Office review stack preserves manual baseline, cancels only latest, surviv
   recoveredOffice.checkpoint=checkpoint
   await write(33) // An independent/manual edit must never be lost by cancelling.
   await assert.rejects(recoveredOffice.resolveReview(recovered.sessionId,item.id,'reject',next.value.review.id),/手动修改/)
+  await assert.rejects(recoveredOffice.resolveReview(recovered.sessionId,item.id,'reject_all',next.value.review.id),/手动修改/)
   await recoveredOffice.resolveReview(recovered.sessionId,item.id,'accept',next.value.review.id)
   assert.equal((await recoveredOffice.execute(recovered.sessionId,item.id,"return univerAPI.getActiveWorkbook().getActiveSheet().getRange('A2').getValue()",recovered.unitId)).value,33)
 })

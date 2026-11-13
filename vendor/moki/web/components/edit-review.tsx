@@ -1,10 +1,11 @@
 import {useRef,type ChangeEvent} from 'react';
-import {Check,Undo2,ChevronDown,Sparkles,LoaderCircle,LocateFixed} from 'lucide-react';
+import {Check,Undo2,ListX,ChevronDown,Sparkles,LoaderCircle,LocateFixed} from 'lucide-react';
 import {l as uiText} from '../../../../src/i18n.js';
 import {textChanges} from '../../../../src/edit-review.js';
 import './edit-review.css';
 
 export type TextReview = {id:string;sequence:number;createdAt:string;before:string};
+export type ReviewAction = 'accept'|'reject'|'reject_all';
 export type ReviewChange = {kind:string;unitId?:string;sheetId?:string;sheetName?:string;range?:string;row?:number;column?:number;slideId?:string;page?:number;elementId?:string;start?:number;end?:number;startOffset?:number;endOffset?:number;before?:string;after?:string;structural?:boolean;removed?:boolean;transform?:unknown};
 export type ReviewEntry = {id:string;sequence:number;createdAt:string;count?:number;changes:ReviewChange[];truncated?:boolean};
 export function reviewLocation(change:ReviewChange) {
@@ -12,7 +13,7 @@ export function reviewLocation(change:ReviewChange) {
   if(change.kind==='slide')return uiText`幻灯片 ${change.page||'—'}`;
   return uiText('文字与格式');
 }
-export function EditReviewBar({entries,busy,status,onResolve,onLocate}:{entries:ReviewEntry[];busy:boolean;status?:string;onResolve:(action:'accept'|'reject',id:string)=>void;onLocate:(change:ReviewChange)=>void}) {
+export function EditReviewBar({entries,busy,status,onResolve,onLocate}:{entries:ReviewEntry[];busy:boolean;status?:string;onResolve:(action:ReviewAction,id:string)=>void;onLocate:(change:ReviewChange)=>void}) {
   const latest=entries.at(-1);
   if(!latest&&!busy)return null;
   return <section className="moki-edit-review" aria-label={uiText('AI 修改审阅')} aria-busy={busy}>
@@ -20,6 +21,7 @@ export function EditReviewBar({entries,busy,status,onResolve,onLocate}:{entries:
       <span className="moki-review-label" role="status">{busy?<LoaderCircle size={15} className="animate-spin"/>:<Sparkles size={15}/>}<strong>{busy?(status||uiText('AI 修改中…')):uiText`${entries.length} 次修改待确认`}</strong></span>
       <span className="moki-review-buttons" onMouseDown={event=>event.preventDefault()}>
         <button type="button" disabled={busy||!latest} onClick={()=>latest&&onResolve('reject',latest.id)}><Undo2 size={14}/>{entries.length>1?uiText('取消最新一次'):uiText('取消本次修改')}</button>
+        {entries.length>1&&<button type="button" data-review-action="reject-all" disabled={busy||!latest} title={uiText('取消所有待确认修改，保留此前的手动编辑')} onClick={()=>latest&&onResolve('reject_all',latest.id)}><ListX size={14}/>{uiText('取消全部')}</button>}
         <button type="button" data-primary disabled={busy||!latest} onClick={()=>latest&&onResolve('accept',latest.id)}><Check size={14}/>{entries.length>1?uiText('采纳全部'):uiText('采纳')}</button>
       </span>
     </div>

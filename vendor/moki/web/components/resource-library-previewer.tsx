@@ -1,6 +1,6 @@
 import { l as uiText, intlLocale } from '../../../../src/i18n.js';
 import {textChange} from '../../../../src/edit-review.js';
-import {EditReviewBar,ReviewTextEditor,type TextReview,type ReviewEntry,type ReviewChange} from './edit-review.js';
+import {EditReviewBar,ReviewTextEditor,type TextReview,type ReviewEntry,type ReviewChange,type ReviewAction} from './edit-review.js';
 import {flushSync} from 'react-dom';
 import { SpreadsheetPreview } from "./spreadsheet-preview.js";
 import {ExtraFilePreview,useFilePreviewInfo} from './resource-extra-preview.js';
@@ -644,12 +644,14 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const selectionPublisher=useRef(publishPreviewSelection);selectionPublisher.current=publishPreviewSelection;
   const officeEditorFrameRef = useRef<HTMLIFrameElement>(null);
   const officeReviewStamp=useRef('');
+  const officeRejectAllSupported=useRef(false);
   async function refreshOfficeReview() {
     const session=univerSessionRef.current;if(!session)return;
-    const result=await draftRequest<{entries:ReviewEntry[];highlights:ReviewChange[];busy:boolean;stamp:string;unchanged?:boolean;session:Partial<ResourceLibraryUniverSession>}>(`univer-session/${session.sessionId}/review?after=${officeReviewStamp.current}`);
+    const result=await draftRequest<{entries:ReviewEntry[];highlights:ReviewChange[];busy:boolean;stamp:string;unchanged?:boolean;capabilities?:{rejectAll?:boolean};session:Partial<ResourceLibraryUniverSession>}>(`univer-session/${session.sessionId}/review?after=${officeReviewStamp.current}`);
     if(univerSessionRef.current?.sessionId!==session.sessionId)return;
     if(result.unchanged)return;
     officeReviewStamp.current=result.stamp;
+    officeRejectAllSupported.current=Boolean(result.capabilities?.rejectAll);
     setOfficeReviews(result.entries);setOfficeReviewHighlights(result.highlights);setReviewRemoteBusy(result.busy);
     if(result.session.viewerUrl!==session.viewerUrl){const next={...session,...result.session};univerSessionRef.current=next;setUniverSession(next);}
     if(result.entries.length)setDirty(true);
@@ -676,14 +678,14 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     autosavePending.current=pending.then(()=>undefined);await pending;
     lastTextCheckpoint.current=JSON.stringify([content,textSourceVersion,review]);
   }
-  async function resolveEditReview(action:'accept'|'reject',expectedId:string) {
+  async function resolveEditReview(action:ReviewAction,expectedId:string) {
     if(reviewBusy)return;
     setReviewResolving(true);
     if(action==='accept')setSaving(true);
     try {
       if(editingText) {
         const latest=textReviews.at(-1);if(latest?.id!==expectedId)throw new Error(uiText('待确认版本已变化，请查看最新修改后再操作'));
-        let content=action==='reject'?latest.before:textContent;
+        let content=action==='reject_all'?textReviews[0].before:action==='reject'?latest.before:textContent;
         const entries=action==='reject'?textReviews.slice(0,-1):[];
         if(action==='accept'){
           await autosavePending.current.catch(()=>undefined);
@@ -697,18 +699,24 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
           await draftRequest('draft','DELETE').catch(()=>draftRequest('draft','PUT',{content,version:saved.version,review:[]}).catch(()=>undefined));
           setAutosaveStatus('');
         }else await persistTextReview(content,entries);
-        setTextContent(content);setTextReviews(entries);setDirty(action==='reject'&&content!==savedTextContent);setTextHistory({undo:[],redo:[]});
+        setTextContent(content);setTextReviews(entries);setDirty(action!=='accept'&&content!==savedTextContent);setTextHistory({undo:[],redo:[]});
       } else {
         const session=univerSessionRef.current;if(!session)return;
         if(action==='accept'){
           await autosavePending.current.catch(()=>undefined);
           await prepareOfficeEditorSave(session,{preserveView:true});
         }
-        const result=await draftRequest<{saved?:boolean;updatedAt?:string}>(`univer-session/${session.sessionId}/review`,'POST',{action,expectedId,save:action==='accept'});
-        await refreshOfficeReview();
-        if(result.saved){acceptedOfficeRevision.current=result.updatedAt||new Date().toISOString();setDirty(false);setAutosaveStatus('');checkpointState.current={...checkpointState.current,dirty:false};}
+        let result:{saved?:boolean;updatedAt?:string}|undefined;
+        try {
+          if(action==='reject_all'&&!officeRejectAllSupported.current) {
+            // Older running hosts only know single-step rollback. Keep every
+            // expected ID so a concurrent new edit stops, rather than joins, it.
+            for(const entry of officeReviews.slice().reverse())result=await draftRequest(`univer-session/${session.sessionId}/review`,'POST',{action:'reject',expectedId:entry.id});
+          } else result=await draftRequest(`univer-session/${session.sessionId}/review`,'POST',{action,expectedId,save:action==='accept'});
+        } finally {await refreshOfficeReview();}
+        if(result?.saved){acceptedOfficeRevision.current=result.updatedAt||new Date().toISOString();setDirty(false);setAutosaveStatus('');checkpointState.current={...checkpointState.current,dirty:false};}
       }
-      setNotice(action==='accept'?uiText('已采纳并保存到原文件，当前页面保持不变'):uiText('已取消最新一次 AI 修改，之前的内容已保留'));
+      setNotice(action==='accept'?uiText('已采纳并保存到原文件，当前页面保持不变'):action==='reject_all'?uiText('已取消全部待确认 AI 修改，此前的手动编辑已保留'):uiText('已取消最新一次 AI 修改，之前的内容已保留'));
     } catch(error) {setNotice(error instanceof Error?error.message:String(error));}
     finally {setReviewResolving(false);if(action==='accept')setSaving(false);}
   }

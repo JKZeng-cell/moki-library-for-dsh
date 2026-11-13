@@ -740,7 +740,7 @@ return { applied };`,
   reviewStatus(sessionId: string, itemId: string) {
     const session = this.requireSession(sessionId,itemId);
     const busy=this.reviewBusy.has(sessionId),stamp=createHash('sha256').update(JSON.stringify([session.viewerUrl,busy,session.review?.entries.map(entry=>entry.id)])).digest('hex');
-    return { stamp,busy, session:{sessionId,itemId,viewerUrl:session.viewerUrl,unitId:session.unitId,kind:session.kind,units:session.units},
+    return { stamp,busy, capabilities:{rejectAll:true}, session:{sessionId,itemId,viewerUrl:session.viewerUrl,unitId:session.unitId,kind:session.kind,units:session.units},
       highlights:session.review?.entries.at(-1)?.highlights||[],
       entries:(session.review?.entries||[]).map(({snapshot,heads,hasChanges,units,highlights,...entry})=>entry) };
   }
@@ -787,23 +787,24 @@ return { applied };`,
       }
     });
   }
-  async resolveReview(sessionId:string,itemId:string,action:'accept'|'reject',expectedId:string,options:{save?:boolean}={}) {
+  async resolveReview(sessionId:string,itemId:string,action:'accept'|'reject'|'reject_all',expectedId:string,options:{save?:boolean}={}) {
     return this.inSession(sessionId,async()=>{
       const session=this.requireEditableSession(sessionId,itemId),review=session.review,latest=review?.entries.at(-1);
       if(!latest || latest.id!==expectedId)throw new Error('待确认版本已变化，请查看最新修改后再操作');
       const previous={...session,review:structuredClone(review)};
       this.reviewBusy.add(sessionId);
       try {
-        const released=action==='accept'?review!.entries.map(entry=>entry.snapshot):[latest.snapshot];
-        if(action==='reject') {
+        const released=action==='reject'?[latest.snapshot]:review!.entries.map(entry=>entry.snapshot);
+        if(action!=='accept') {
           if(await this.reviewHeads(session)!==latest.heads)throw new Error('待确认内容又被手动修改，已保留当前内容；请先采纳当前版本，避免取消时覆盖您的修改');
+          const baseline=action==='reject_all'?review!.entries[0]:latest;
           const targetDirectory=join(this.stateDirectory,'univer-office-sessions',randomUUID());await mkdir(targetDirectory,{recursive:true});
           const directory=await realpath(targetDirectory);
-          const restored=join(directory,'document.univer');await this.copyReviewSnapshot(latest.snapshot,restored);
+          const restored=join(directory,'document.univer');await this.copyReviewSnapshot(baseline.snapshot,restored);
           const state=asRecord(await this.service.fileState({workspace:directory,file:restored}), 'Office 审阅恢复');
-          const viewerUrl=editableWorktreeViewerUrl(state,session.worktreeId,latest.unitId);
-          Object.assign(session,{workspace:directory,univerPath:restored,viewerUrl,unitId:latest.unitId,units:latest.units,hasChanges:latest.hasChanges});
-          review!.entries.pop();
+          const viewerUrl=editableWorktreeViewerUrl(state,session.worktreeId,baseline.unitId);
+          Object.assign(session,{workspace:directory,univerPath:restored,viewerUrl,unitId:baseline.unitId,units:baseline.units,hasChanges:baseline.hasChanges});
+          review!.entries=action==='reject_all'?[]:review!.entries.slice(0,-1);
         } else review!.entries=[];
         if(!review!.entries.length && review!.baselineFile){released.push(review!.baselineFile);delete review!.baselineFile;}
         // Acceptance can save without retiring the live worktree. Keep the

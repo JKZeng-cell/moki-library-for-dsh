@@ -184,7 +184,7 @@
   "资料选择未完成": "Item selection not completed",
   "从资料库添加": "Add from library",
   "按树状目录展开文件夹，勾选内容后统一确认添加。": "Browse folders, select items, then confirm to add them together.",
-  "确认添加": "Confirm add",
+  "确认添加": "Add",
   "预览 {0}": "Preview {0}",
   "预览": "Preview",
   "文件夹创建失败，请重试。": "Could not create the folder. Try again.",
@@ -845,5 +845,15 @@
   "单元格": "Cell",
   "列表项": "List item",
   "表单": "Form",
-  "模块": "Module"
+  "模块": "Module",
+  "原文件保留在当前位置": "The original file stays where it is",
+  "目标文件夹": "Destination folders",
+  "此文件夹中没有子文件夹": "No subfolders here",
+  "试试其他名称，或清除搜索浏览文件夹": "Try another name, or clear the search to browse folders",
+  "可以直接添加到这里，或新建文件夹": "Add here, or create a folder",
+  "新建位置": "Create in",
+  "添加到": "Add to",
+  "返回": "Back",
+  "正在创建…": "Creating…",
+  "创建并进入": "Create and open"
 }

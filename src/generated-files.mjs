@@ -42,7 +42,7 @@ export async function generatedFileAction(ctx,runtime,input,signal) {
   const items=db.prepare(`SELECT id,name,kind,parent_id AS parentId,folder_color AS folderColor FROM resource_library_items WHERE kind IN ('folder','local_folder') AND (${where}) ORDER BY name COLLATE NOCASE,id LIMIT 61 OFFSET ?`).all(query||data.parentId,data.offset)
   const ancestors=[],visited=new Set()
   for(let folder=parent;folder&&!visited.has(folder.id);folder=folder.parentId&&repository.find(folder.parentId)) {
-    ancestors.unshift({id:folder.id,name:folder.name});visited.add(folder.id)
+    ancestors.unshift({id:folder.id,name:folder.name,folderColor:folder.folderColor});visited.add(folder.id)
   }
   return {items:items.slice(0,60),more:items.length>60,ancestors}
 }

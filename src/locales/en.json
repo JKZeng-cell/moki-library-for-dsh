@@ -791,7 +791,7 @@
   "幻灯片 {0}": "Slide {0}",
   "已有 20 次待确认修改，请先在文件中采纳或取消": "There are 20 pending edits. Accept or discard them in the file first.",
   "待确认内容又被手动修改，已保留当前内容；请先采纳当前版本，避免取消时覆盖您的修改": "The pending draft was changed elsewhere. Your current content is preserved. Accept it before editing further to avoid overwriting those changes.",
-  "引用选区与 DSH 对话": "Quote selection in DSH",
+  "引用选区与 DSH 对话": "Ask DSH about selection",
   "在此处与 DSH 对话": "Chat with DSH here",
   "选区快捷对话": "Quick selection chat",
   "与 DSH 对话": "Chat with DSH",
@@ -812,5 +812,8 @@
   "DSH 未能发送，请检查会话后重试": "DSH could not send the message. Check the conversation and retry.",
   "发送失败，请重试": "Could not send. Please try again.",
   "正在保存…": "Saving…",
-  "正在取消修改…": "Discarding edit…"
+  "正在取消修改…": "Discarding edit…",
+  "在 MOKI资料库中打开": "Open in MOKI Library",
+  "无法在资料库中打开此文件": "Could not open this file in MOKI Library",
+  "正在打开…": "Opening…"
 }

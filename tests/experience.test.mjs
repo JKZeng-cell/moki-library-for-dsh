@@ -37,6 +37,31 @@ test('English catalog preserves placeholders and user-supplied contents',async()
   } finally {off();setLocale('zh')}
 })
 
+test('new folders persist the selected color and use readable dark and light palettes',{timeout:30000},async t=>{
+  const env=await setup(t);if(!env)return
+  const {runtime,page}=env
+  page.setDefaultTimeout(5000)
+  for(const theme of ['dark','light']){
+    await page.goto(runtime.openFrame('folder-color-'+theme,'dsh-app://app').url+'?locale=en&theme='+theme)
+    await page.click('[aria-label="New"]')
+    await page.$$eval('[role="menuitem"]',items=>items.find(e=>e.textContent.trim()==='New folder').click())
+    await page.waitForSelector('.library-edit-dialog')
+    assert.equal(await page.$$eval('.library-folder-color-option',items=>items.length),6)
+    await page.type('.library-edit-dialog input',theme+' folder')
+    await page.click('.library-folder-color-option[aria-label="Blue"]')
+    assert.equal(await page.$eval('.library-folder-color-option[aria-label="Blue"]',el=>el.getAttribute('aria-pressed')),'true')
+    const color=await page.$eval('.library-folder-color-option[aria-label="Blue"]',el=>{const s=getComputedStyle(el);return {foreground:s.color,background:s.backgroundColor}})
+    assert.notEqual(color.foreground,color.background)
+    await page.$$eval('.library-edit-dialog footer button',items=>items.find(e=>e.textContent.trim()==='Save').click())
+    await page.waitForFunction(()=>!document.querySelector('.library-edit-dialog'))
+    const item=runtime.repository.list().find(i=>i.name===theme+' folder')
+    assert.equal(item.folderColor,'blue')
+    await page.goto(runtime.openFrame('folder-reopen-'+theme,'dsh-app://app').url+'?locale=en&theme='+theme)
+    await page.waitForSelector(`[data-resource-id="${item.id}"] .library-folder-icon-colored`)
+    assert.equal(await page.$eval(`[data-resource-id="${item.id}"] .library-folder-icon-colored`,el=>getComputedStyle(el).color),color.foreground)
+  }
+})
+
 test('both outer gutters initiate grid and list marquee at nonzero scroll without moving rows',{timeout:45000},async t=>{
   const env=await setup(t);if(!env)return
   const {runtime,page}=env

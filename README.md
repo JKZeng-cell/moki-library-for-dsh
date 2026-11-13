@@ -55,9 +55,9 @@ Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.
 Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
 
 Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
-Version: 0.1.68
-Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.68/dsh-moki-library-0.1.68.tgz
-SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.68/SHA256SUMS.txt
+Version: 0.1.69
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.69/dsh-moki-library-0.1.69.tgz
+SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.69/SHA256SUMS.txt
 
 Follow these steps:
 1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
@@ -67,7 +67,7 @@ Follow these steps:
    dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
 5. Check the installed version:
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   Confirm that desktop lists version 0.1.68 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+   Confirm that desktop lists version 0.1.69 (or the newer version retained above). Preserve existing plugins, configuration and library data.
 6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
 
 If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
@@ -81,12 +81,12 @@ If this conversation cannot download files or execute a terminal, the environmen
 
 ### Option 2: Install manually in a terminal
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.68.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.68).
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.69.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.69).
 2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.68.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.69.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -142,6 +142,14 @@ The [illustrated usage demos](docs/usage-demos.md) include exact steps, sample p
 The whale opens the same compact selection input as MOKI Canvas. After sending in the side workspace, the current main conversation receives focus so the file stays beside the chat. The DSH conversation button and Alt+D still open the conversation directly. Main-window and standalone previews use a floating conversation with DSH's native input, moving/resizing and session creation/switching. A standalone preview keeps its conversation inside that window. Moving back to the side workspace routes quotes to the current main session instead of a previously selected floating history session.
 
 Default context text is bounded to 4,000 characters; composer quotes to 1,000. Truncation is marked. Tools can request more content when needed. Selection references are scoped to the conversation/editor, expire after ten minutes, and reject stale or reused edits.
+
+### HTML selections, folder colors and generated files
+
+Select text in a rendered HTML preview and click the whale to enter instructions with optional attachments. The selection is mapped to exact source text nodes, so repeated text elsewhere is preserved. Inline markup stays intact; replacements are escaped as text. HTML scripts remain disabled. AI edits are highlighted for review; accepting saves without reloading the preview or resetting its scroll position. Switch to source view for structural or style edits.
+
+New folders offer six colors (violet, blue, green, amber, rose and slate) with matching light and dark palettes. The choice persists and can also be changed from the folder context menu.
+
+DSH generated-file cards and change review pages offer a **Library** button; file context menus include **Open in MOKI Library**. The original file is mapped under **DSH task files** once, independently of the automatic-mapping setting. Existing mappings are reused. Preview preferences determine the destination; automatic mode opens a new side tab when the library is already docked. Explicitly choosing the library overrides a system-app default and opens the library's main window.
 
 ## Preview and editing formats
 

@@ -22,7 +22,7 @@ export const WorkspaceEditorActionSchema = z.object({
   operation: WorkspaceEditorOperationSchema,
   tabId: z.string().optional(),
   content: z.string().max(900_000).optional(),
-  range: z.object({start:z.number().int().nonnegative(),end:z.number().int().nonnegative(),expectedText:z.string().max(900_000)}).optional(),
+  range: z.object({start:z.number().int().nonnegative(),end:z.number().int().nonnegative(),expectedText:z.string().max(900_000),html:z.array(z.object({start:z.number().int().nonnegative(),end:z.number().int().nonnegative(),from:z.number().int().nonnegative(),to:z.number().int().nonnegative()})).min(1).max(256).optional()}).optional(),
   patches: z.array(z.object({before:z.string().min(1).max(900_000),after:z.string().max(900_000),expectedCount:z.number().int().min(1).max(1000).optional()})).min(1).max(100).optional(),
   destination: z.string().min(1).max(4096).optional(),
   revision: z.number().int().nonnegative().optional(),

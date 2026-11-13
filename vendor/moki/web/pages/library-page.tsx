@@ -1118,6 +1118,7 @@ export function LibraryPage() {
   });
   const [message, setMessage] = useState("");
   const [name, setName] = useState("");
+  const [newFolderColor, setNewFolderColor] = useState<FolderColor>("violet");
   const [kind, setKind] = useState<"local_file" | "local_folder" | "url">(
     "local_file",
   );
@@ -1675,6 +1676,7 @@ export function LibraryPage() {
     setEditingItem(undefined);
     setAssistantPermission(null);
     setName("");
+    setNewFolderColor("violet");
     setTarget("");
     setKind("local_file");
     setFileFormat("markdown");
@@ -2409,6 +2411,7 @@ export function LibraryPage() {
           parentId: folderId,
           kind: "folder",
           name: name.trim(),
+          folderColor: newFolderColor,
           tags: nextTags,
         });
       } else if (createMode === "file") {
@@ -4191,6 +4194,22 @@ export function LibraryPage() {
                   className="h-10 rounded-xl border border-[#dedfea] px-3"
                 />
               </label>
+              {!editingItem && createMode === "folder" ? (
+                <fieldset className="grid gap-2" disabled={busy}>
+                  <legend className="mb-2 text-[0.6875rem] font-bold">{uiText("文件夹颜色")}</legend>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {FOLDER_COLORS.map((color) => (
+                      <button key={color.id} type="button" aria-label={color.label}
+                        aria-pressed={newFolderColor === color.id}
+                        title={color.label} onClick={() => setNewFolderColor(color.id)}
+                        className="library-folder-color-option library-folder-icon-colored" style={folderPaletteStyle(color)}>
+                        <Folder size={18} aria-hidden="true" />
+                      </button>
+                    ))}
+                    <span className="text-xs">{FOLDER_COLORS.find(color => color.id === newFolderColor)?.label}</span>
+                  </div>
+                </fieldset>
+              ) : null}
               {!editingItem && createMode === "file" && fileFormat !== "univer" ? (
                 <label className="grid gap-1.5 text-[0.6875rem] font-bold">{uiText("初始内容")}<textarea
                     value={fileContent}

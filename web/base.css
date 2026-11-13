@@ -19,6 +19,8 @@ button:disabled { cursor:default; }
 }
 .library-folder-color-swatch { flex:none; width:22px; height:22px; border:1px solid var(--moki-control-border); border-radius:50%; background-color:currentColor; }
 .library-folder-color-swatch[aria-checked="true"] { outline:2px solid var(--moki-focus); outline-offset:2px; }
+.library-folder-color-option { display:grid; place-items:center; width:34px; height:34px; flex:none; border:1px solid var(--moki-control-border); border-radius:8px; }
+.library-folder-color-option[aria-pressed="true"] { outline:2px solid var(--moki-focus); outline-offset:2px; }
 .moki-menu-divider { height:1px; margin:4px; background:var(--moki-border); }
 .moki-powerpoint-viewer { display:flex; flex-direction:column; }
 .moki-powerpoint-viewer > .rpv-toolbar { flex:0 0 48px; }

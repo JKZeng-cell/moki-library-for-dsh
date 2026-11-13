@@ -8,6 +8,7 @@ import {registerComposerActions} from './client-picker.js'
 import {selectionQuote as quote} from './selection-context.js'
 import {setLocale,getLocale,subscribeLocale} from './i18n.js'
 import {watchLibraryLanguage} from './preferences.mjs'
+import {registerGeneratedFileActions} from './client-generated-files.js'
 import css from './client-shell.css'
 window.__ModuleLoader__.load({
   id:'dsh-moki-library',
@@ -59,6 +60,7 @@ window.__ModuleLoader__.load({
         const pool = createFramePool(isDark,ctx,quote,settings.form)
         ctx.effect(()=>()=>pool.dispose(),'moki-library: open documents')
         registerPanels(ctx,React,{Icon,Chat,Conversation,useChatBinding,quote,publish,views,pool,css,kind,type,t,ui,SettingsButton:settings.SettingsButton})
+        registerGeneratedFileActions(ctx,React,{Icon,ui,pool})
       }
     }
   }

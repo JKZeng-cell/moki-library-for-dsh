@@ -86,7 +86,12 @@ export function selectionEdits(runtime){
     const owner=runtime.collaboration(chat).owner,rawTarget=data.editorSelection
     const target=rawTarget&&Object.fromEntries(['kind','unitId','sheetId','range','ranges','row','column','endRow','endColumn','startOffset','endOffset','segmentId','slideId','textSelection'].filter(key=>rawTarget[key]!==undefined).map(key=>[key,rawTarget[key]]))
     let snapshot
-    if(editor.mode==='text'&&data.mode==='text-editor'&&data.caret&&typeof data.selectedText==='string'&&!data.selectedTextTruncated&&data.caret.end>data.caret.start){
+    if(editor.mode==='text'&&data.htmlSelection?.segments?.length&&!data.selectedTextTruncated){
+      if(data.revision!==editor.revision)throw Error('HTML 选区正在同步，请重新读取 context')
+      const {segments,expectedText}=data.htmlSelection
+      if(!Array.isArray(segments)||segments.length>256||typeof expectedText!=='string'||!expectedText||expectedText.length>8000)return null
+      snapshot={html:segments,expectedText,start:Math.min(...segments.map(s=>s.start)),end:Math.max(...segments.map(s=>s.end))}
+    }else if(editor.mode==='text'&&data.mode==='text-editor'&&data.caret&&typeof data.selectedText==='string'&&!data.selectedTextTruncated&&data.caret.end>data.caret.start){
       if(data.revision!==editor.revision)throw Error('文本选区正在同步，请重新读取 context')
       if(data.caret.end-data.caret.start!==data.selectedText.length)return null
       snapshot={expectedText:data.selectedText,start:data.caret.start,end:data.caret.end}
@@ -120,7 +125,7 @@ export function selectionEdits(runtime){
       let result
       if(current.mode==='text'){
         if(text===undefined||values!==undefined)throw Error('文字选区需要 text')
-        result=await runtime.session(access.owner).editors.request({editorId:current.editorId,id:current.id,revision:current.revision,operation:'replace_range',range:{start:snapshot.start,end:snapshot.end,expectedText:snapshot.expectedText},content:text})
+        result=await runtime.session(access.owner).editors.request({editorId:current.editorId,id:current.id,revision:current.revision,operation:'replace_range',range:{start:snapshot.start,end:snapshot.end,expectedText:snapshot.expectedText,...(snapshot.html?{html:snapshot.html}:{})},content:text})
         if(result.status!=='completed')throw Error(result.message)
         result={text,location:{start:snapshot.start,end:snapshot.start+text.length},review:result.review}
       }else{

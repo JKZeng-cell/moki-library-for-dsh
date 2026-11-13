@@ -12,6 +12,7 @@ import { z } from 'zod'
 import schema from '@deepseek-ai/schemastery'
 import {defaults, option} from './preferences.mjs'
 import {taskFileMapper, listenForTaskFiles} from './task-files.mjs'
+import {registerGeneratedFiles} from './generated-files.mjs'
 import { ResourceLibraryRepository } from '../vendor/moki/server/repositories/resource-library-repository.ts'
 import { registerResourceLibraryRoutes } from '../vendor/moki/server/routes/resource-library-routes.ts'
 import {registerPreviewFiles} from './preview-files.mjs'
@@ -326,6 +327,7 @@ export async function apply(ctx,config={}) {
   const runtime=await createRuntime({...config,chatHost})
   ctx.effect(()=>()=>runtime.close(),'moki-library: store')
   listenForTaskFiles(ctx,runtime.taskFiles)
+  registerGeneratedFiles(ctx,runtime)
   ctx.inject(['settings'],child=>child.effect(()=>child.settings.configure({auto:false},ctx.fiber)))
   ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/moki-library/attachments',resource:async request=>{
     if (request.method!=='GET' || request.headers.get('x-moki-library')!=='1' || request.headers.get('sec-fetch-site')==='cross-site')

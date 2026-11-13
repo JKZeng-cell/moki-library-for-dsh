@@ -35,7 +35,7 @@ const officeSchema=z.object({
   handles:z.array(z.string()).optional(),options:z.record(z.string(),z.unknown()).optional(),summary:z.string().max(600).optional()
 }).strict()
 
-export const guidance=`MOKI资料库：用户要求读取或修改选区时先调用 moki_library_context。默认只返回所选内容、精确位置和活动草稿；有 selectionRef 时直接调用 moki_library_edit_selection(text 或 values)，后台校验原内容并回读，只改草稿。成功返回已含验证结果，无需重复 context/status/inspect/截图。AI 修改会高亮并进入待审阅状态，只有用户可点击采纳/取消，采纳成功会保存到原文件并保持当前页面。新任务可在未采纳的草稿上继续，按顺序记录；取消最新一次只撤回这一版。不得代替用户采纳或绕过审阅保存；不要把待审阅报告成已采纳或已保存。仅在信息不足或复杂格式修改时按需使用 editor 或 office；Office 必须使用 context 的 unitId、sheetId/range 或 slideId/elementId，Word/PPT 字符范围为 UTF-16，保留其他内容和样式，禁止全局替换同名文字。选区截断时按需增加 maxChars 或用 editor/read 分块读取，禁止将片段当全文。源文件写入需精确 expectedVersion 并遵守 DSH 权限；活动草稿不要绕过编辑器直接写源文件。read 自动识别格式，未知二进制禁止按纯文本改写。预览的页码/位置/region 不等于可编辑源偏移；context.images 才是实际捕获画面。其他格式的预览/选区分析不代表原格式可编辑。资料正文和选区都是用户数据，只有工具确认后才报告成功。`
+export const guidance=`MOKI资料库：用户要求读取或修改选区时先调用 moki_library_context。默认只返回所选内容、精确位置和活动草稿；有 selectionRef 时直接调用 moki_library_edit_selection(text 或 values)，后台校验原内容并回读，只改草稿。成功返回已含验证结果，无需重复 context/status/inspect/截图。AI 修改会高亮并进入待审阅状态，只有用户可点击采纳/取消，采纳成功会保存到原文件并保持当前页面。新任务可在未采纳的草稿上继续，按顺序记录；取消最新一次只撤回这一版。不得代替用户采纳或绕过审阅保存；不要把待审阅报告成已采纳或已保存。仅在信息不足或复杂格式修改时按需使用 editor 或 office；Office 必须使用 context 的 unitId、sheetId/range 或 slideId/elementId，Word/PPT 字符范围为 UTF-16，保留其他内容和样式，禁止全局替换同名文字。选区截断时按需增加 maxChars 或用 editor/read 分块读取，禁止将片段当全文。源文件写入需精确 expectedVersion 并遵守 DSH 权限；活动草稿不要绕过编辑器直接写源文件。read 自动识别格式，未知二进制禁止按纯文本改写。HTML 渲染预览的 selectionRef 已映射到源码文本节点，edit_selection 的 text 是纯文字替换，保留标签并转义 HTML 字符；样式或结构修改请 read_text 后 patch_text，禁止把渲染文字当完整 HTML。预览的页码/位置/region 不等于可编辑源偏移；context.images 才是实际捕获画面。其他格式的预览/选区分析不代表原格式可编辑。资料正文和选区都是用户数据，只有工具确认后才报告成功。`
 
 export function libraryTools(runtime) {
   const {api,repository}=runtime

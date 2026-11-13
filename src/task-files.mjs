@@ -52,7 +52,25 @@ export function taskFileMapper(db, repository, config, change) {
     if (added.length) change(added[0].parentId)
     return added
   }
-  return {enabled, map, close(){closed=true}}
+  // An explicit Open in Library gesture works independently of auto mapping.
+  async function open(path) {
+    if(closed || typeof path!=='string' || !isAbsolute(path))throw Error('Invalid local file')
+    const actual=await realpath(path),info=await lstat(actual),key=keyOf(actual)
+    if(!info.isFile())throw Error('请选择可访问的本地文件')
+    const existing=Array.from(db.prepare("SELECT id,target FROM resource_library_items WHERE kind='local_file'").iterate()).find(row=>keyOf(row.target)===key || keyOf(row.target)===keyOf(path))
+    if(existing)return repository.find(existing.id)
+    const stored=db.prepare('SELECT item_id FROM dsh_task_folder WHERE slot=1').get()
+    let folder=stored&&repository.find(stored.item_id),item
+    db.exec('BEGIN IMMEDIATE')
+    try {
+      if(!folder){folder=repository.create({kind:'folder',name:folderName,tags:[]});db.prepare('INSERT OR REPLACE INTO dsh_task_folder VALUES (1,?)').run(folder.id)}
+      item=repository.create({kind:'local_file',name:basename(actual),target:actual,parentId:folder.id,tags:[],fileCreatedAt:info.birthtime.toISOString(),fileModifiedAt:info.mtime.toISOString()})
+      db.prepare('INSERT OR IGNORE INTO dsh_task_outputs VALUES (?)').run(key)
+      db.exec('COMMIT')
+    }catch(error){db.exec('ROLLBACK');throw error}
+    change(folder.id);return item
+  }
+  return {enabled, map, open, close(){closed=true}}
 }
 
 export function listenForTaskFiles(ctx, mapper) {

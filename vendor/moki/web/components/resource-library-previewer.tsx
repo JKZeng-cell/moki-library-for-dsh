@@ -7,6 +7,9 @@ import {ExtraFilePreview,useFilePreviewInfo} from './resource-extra-preview.js';
 import {readPreviewSelection,previewLocation,selectionLabel,capturePreviewVisual,type PreviewSelection,type VisualSnapshot} from './resource-preview-selection.js';
 import {PreviewRegionSelection} from './resource-region-selection.js';
 import {SelectionChatAction} from './selection-chat-action.js';
+import {HtmlPreview} from './html-preview.js';
+import {replaceHtmlSelection} from '../lib/html-selection.js';
+import {textChanges} from '../../../../src/edit-review.js';
 import { Button, IconButton } from "./ui-controls.js";
 import "./resource-preview-header.css";
 import { apiFetch, panelUrl } from "../lib/api-fetch.js";
@@ -534,20 +537,21 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const mokiEditorAssistantOpenedRef = useRef(false);
   const univerSessionRef = useRef<ResourceLibraryUniverSession | undefined>(undefined);
   const editorRevision = useRef({ signature: '', value: 0 });
-  const editorSignature = JSON.stringify([textContent, editingText, editingOffice, univerSession?.sessionId,textHistory.undo.length,textHistory.redo.length,pendingReviews]);
+  const editorSignature = JSON.stringify([textContent, editingText, editingOffice, renderedTextPreview, univerSession?.sessionId,textHistory.undo.length,textHistory.redo.length,pendingReviews]);
   if (editorRevision.current.signature !== editorSignature) editorRevision.current = { signature: editorSignature, value: editorRevision.current.value + 1 };
   const officeEditable = kind !== 'pending' && isOfficeEditorSupportedExtension(extension);
+  const htmlPreview = kind === 'text' && renderedTextPreview && ['html','htm'].includes(extension);
   const editorOperations: WorkspaceEditorState['operations'] = loading || saving ? [] : [
     ...(kind === 'text' || officeEditable ? ['edit' as const] : []),
     ...(editingText || editingOffice ? ['save' as const] : []),
-    ...(editingText ? ['read_text' as const, 'replace_text' as const, 'replace_range' as const, 'patch_text' as const] : []),
+    ...(editingText || htmlPreview ? ['read_text' as const, 'replace_text' as const, 'replace_range' as const, 'patch_text' as const] : []),
     ...(editingText && textHistory.undo.length ? ['undo' as const] : []),
     ...(editingText && textHistory.redo.length ? ['redo' as const] : []),
     ...(editingText || editingOffice ? ['discard' as const] : []),
     'save_as',
   ];
   useWorkspaceEditor(embedded && item.kind === 'local_file', {
-    id: item.id, name: item.name, active, mode: editingOffice ? 'office' : editingText ? 'text' : 'preview',
+    id: item.id, name: item.name, active, mode: editingOffice ? 'office' : editingText || htmlPreview ? 'text' : 'preview',
     sessionId: univerSession?.sessionId, dirty, revision: editorRevision.current.value, operations: editorOperations,reviewCapable:true,pendingReviews,
   }, executeWorkspaceCommand);
   const [autosaveStatus, setAutosaveStatus] = useState('');
@@ -618,7 +622,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   const [selectingRegion,setSelectingRegion]=useState(false);
   function previewContent(){return previewWindowRef.current?.querySelector<HTMLElement>('.dsh-preview-content')??null}
   function publishPreviewSelection(detail?:PreviewSelection){
-    const next=detail??readPreviewSelection(previewContent(),undefined,editingText?textContent:undefined);
+    const next=detail??(htmlPreview?undefined:readPreviewSelection(previewContent(),undefined,editingText?textContent:undefined));
     if(next)selectedPreview.current=next;
     const selected=selectedPreview.current;
     const location={...previewLocation(previewContent()),...selected.location};
@@ -735,7 +739,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
   }, [active, editingOffice, item.id, item.updatedAt, kind, officeRevision, presentationSlideIndex]);
 
   useEffect(() => {
-    if(!embedded||!active)return;
+    if(!embedded||!active||htmlPreview)return;
     selectedPreview.current={};selectionPublisher.current({});
     let timer:ReturnType<typeof setTimeout>;
     const publish=(event:Event)=>{const target=event.target;clearTimeout(timer);timer=setTimeout(()=>{
@@ -751,7 +755,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     return()=>{clearTimeout(timer);document.removeEventListener('selectionchange',publish);previewWindowRef.current?.removeEventListener('pointerup',publish);previewWindowRef.current?.removeEventListener('keyup',publish);window.removeEventListener('moki:preview-location-changed',changed);
       const previous=readWorkbenchSelectionContext();try{if(previous&&JSON.parse(previous.content).file?.id===item.id)clearWorkbenchSelectionContext('library')}catch{}
     };
-  },[embedded,active,item.id]);
+  },[embedded,active,item.id,htmlPreview]);
   useEffect(()=>{if(embedded&&active)selectionPublisher.current()},[kind,editingText,textContent,univerSession,activeSheetIndex,presentationSlideIndex]);
   useEffect(() => () => {
     if (mokiEditorAssistantOpenedRef.current) {
@@ -1452,8 +1456,9 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
     if (command.operation === 'read_text') return {status:'completed',message:uiText("当前文本草稿（含未保存修改）"),content:textContent};
     if (['replace_text','replace_range','patch_text'].includes(command.operation)) {
       const range=command.range;
-      if(command.operation==='replace_range'&&(!range||range.end>textContent.length||textContent.slice(range.start,range.end)!==range.expectedText))throw new Error(uiText("选区内容已变化，请重新读取草稿和位置"));
-      const nextContent = command.operation === 'patch_text' ? applyTextDraftPatches(textContent, command.patches ?? []) : command.operation==='replace_range'?textContent.slice(0,range!.start)+command.content!+textContent.slice(range!.end):command.content!;
+      if(command.operation==='replace_range'&&(!range||range.end>textContent.length||(!range.html&&textContent.slice(range.start,range.end)!==range.expectedText)))throw new Error(uiText("选区内容已变化，请重新读取草稿和位置"));
+      if(range?.html && !['html','htm'].includes(extension))throw new Error('HTML selection requires an HTML file');
+      const nextContent = command.operation === 'patch_text' ? applyTextDraftPatches(textContent, command.patches ?? []) : command.operation==='replace_range'?(range!.html?replaceHtmlSelection(textContent,{segments:range!.html,expectedText:range!.expectedText},command.content!):textContent.slice(0,range!.start)+command.content!+textContent.slice(range!.end)):command.content!;
       if (nextContent === textContent) return {status:'completed',message:uiText("草稿内容未变化")};
       if(textReviews.length>=20 || textReviews.reduce((n,e)=>n+e.before.length,0)+textContent.length+nextContent.length>3_500_000)throw new Error(uiText('待确认修改较多，请先采纳或取消后继续'));
       const review={id:crypto.randomUUID(),sequence:++textReviewSequence.current,createdAt:new Date().toISOString(),before:textContent};
@@ -1464,7 +1469,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
       const undo=[...textHistory.undo,textContent].slice(-20);
       while(undo.length>1 && undo.reduce((size,text)=>size+text.length,0)>5_000_000) undo.shift();
       setTextHistory({undo,redo:[]});
-      setTextContent(nextContent); setDirty(true);selectedPreview.current={};
+      setTextContent(nextContent); setEditingText(true); setDirty(true);selectedPreview.current={};
       return {status:'completed',message:uiText('AI 修改已高亮，等待用户采纳或取消；尚未保存'),review:{id:review.id,pending:reviews.length}};
     }
     if (command.operation === 'undo' || command.operation === 'redo') {
@@ -1834,7 +1839,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
         maxHeight: embedded ? undefined : contained ? "calc(100% - 2rem)" : undefined,
       }}
     >
-      <SelectionChatAction root={previewWindowRef} active={active&&!editingOffice&&!exitIntent&&!libraryImagePickerOpen} sourceText={editingText?textContent:undefined} onQuote={(selected,anchor)=>{
+      <SelectionChatAction root={previewWindowRef} active={active&&!htmlPreview&&!editingOffice&&!exitIntent&&!libraryImagePickerOpen} sourceText={editingText?textContent:undefined} onQuote={(selected,anchor)=>{
         selectedPreview.current=selected;mokiAssistancePendingRef.current=true;mokiEditorAssistantOpenedRef.current=true;
         requestMokiAssistance(publishPreviewSelection(selected),'',{anchor,preferInline:true,prefillPrompt:false,editorAssist:true,quoteSelection:true});
       }}/>
@@ -1891,7 +1896,7 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
             <Button size="compact" disabled={loading} onClick={() => void togglePdfText()}>{loading ? <LoaderCircle size={13} className="animate-spin"/> : <FileText size={13}/>} {pdfTextOpen ? uiText("查看原 PDF") : uiText("提取文本")}</Button>
           </> : null}
           {kind === "text" ? <>
-            {!editingText && ["md", "markdown", "html", "htm", "json"].includes(extension) ? <Button size="compact" onClick={() => setRenderedTextPreview((value) => !value)}>{renderedTextPreview ? uiText("查看源码") : uiText("渲染预览")}</Button> : null}
+            {(!editingText || ['html','htm'].includes(extension)) && ["md", "markdown", "html", "htm", "json"].includes(extension) ? <Button size="compact" onClick={() => setRenderedTextPreview((value) => !value)}>{renderedTextPreview ? uiText("查看源码") : uiText("渲染预览")}</Button> : null}
             {(extension === "csv" || extension === "tsv") ? <Button size="compact" onClick={() => setTableMode((value) => !value)}>{tableMode ? uiText("文本模式") : uiText("表格模式")}</Button> : null}
             {!editingText ? <>
               <IconButton aria-label={uiText("编辑")} title={uiText("编辑")} onClick={() => { setEditingText(true); setRenderedTextPreview(false); setNotice(""); }}><Pencil size={14}/></IconButton>
@@ -2046,7 +2051,12 @@ export function ResourceLibraryPreviewer({ item, onClose, onOpen, onThumbnail, l
         {previewUrl && kind === "embedded" && !pdfTextOpen ? extension==='pdf'?<Suspense fallback={<div role="status">{uiText("正在加载 PDF…")}</div>}><PdfPreview url={previewUrl}/></Suspense>:<iframe src={previewUrl} title={item.name} loading="lazy" className="size-full border-0"/> : null}
         {kind === "embedded" && extension === "pdf" && pdfTextOpen ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{ocrProgress ? uiText`正在${ocrProgress.phase === "rendering" ? uiText("渲染") : uiText("识别")}第 ${ocrProgress.currentPage}/${ocrProgress.totalPages} 页` : uiText("正在提取 PDF 文本")}</span></div> : structuredPreview?.kind === "pdf" ? <div className="library-pdf-text size-full overflow-auto bg-[#eef0f5] p-5"><div className="mx-auto grid max-w-4xl gap-4"><div className="flex items-center justify-between rounded-xl border border-[#e2e4ed] bg-white px-4 py-3"><span className="text-xs font-bold text-[#697083]">{uiText("文本来源")}</span><span className={`rounded-full px-2.5 py-1 text-[0.625rem] font-extrabold ${structuredPreview.source === "deepseek-ocr" ? "bg-[#e9e7ff] text-[#625bc5]" : "bg-[#edf9f4] text-[#357d65]"}`}>{structuredPreview.source === "deepseek-ocr" ? "DeepSeek OCR" : uiText("PDF 文字层")}</span></div>{structuredPreview.pages.map((page) => <article key={page.number} data-moki-page-number={page.number} data-moki-location={JSON.stringify({kind:"pdf",page:page.number})} className="rounded-xl bg-white px-8 py-7 shadow-sm"><div className="mb-4 flex items-center justify-between border-b border-[#eceef3] pb-3"><b className="text-[0.75rem] text-[#464c61]">{uiText("第")}{page.number}{uiText("页")}</b><span className="text-[0.625rem] font-semibold text-[#999fb0]">{page.text.length}{uiText("字符")}</span></div>{page.text ? structuredPreview.source === "deepseek-ocr" ? <MarkdownRenderer content={page.text} className="text-sm leading-7"/> : <p data-moki-selection-text="pdf-text" className="whitespace-pre-wrap text-sm leading-7 text-[#30364b]">{page.text}</p> : <p className="text-sm font-semibold text-[#9a7a3b]">{uiText("本页没有可提取的文本层，可点击 DeepSeek OCR 识别")}</p>}</article>)}</div></div> : <div className="grid size-full place-items-center text-sm font-bold text-[#7c8294]">{uiText("无法提取此 PDF 的文本")}</div> : null}
         {previewUrl && kind === "web" ? <div className="flex size-full flex-col bg-white"><div className="flex shrink-0 items-center gap-2 border-b border-[#e3e5ed] bg-[#f7f8fb] px-3 py-2 text-[0.6875rem] font-semibold text-[#697083]"><span className="size-2 rounded-full bg-[#4aa681]"/><span className="min-w-0 flex-1 truncate">{uiText("网页预览")}</span></div><iframe src={previewUrl} title={uiText`${item.name} 在线页面`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox={onlinePreviewSandbox(previewUrl)} className="min-h-0 flex-1 border-0"/></div> : null}
-        {kind === "text" ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在读取文本")}</span></div> : !editingText && renderedTextPreview && ["html", "htm"].includes(extension) ? <iframe title={uiText`${item.name} HTML 预览`} srcDoc={textContent} sandbox="allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" referrerPolicy="no-referrer" className="size-full border-0 bg-white"/> : !editingText && renderedTextPreview && ["md", "markdown"].includes(extension) ? <div className="size-full overflow-auto bg-white p-6"><MarkdownRenderer content={textContent} className="mx-auto max-w-4xl text-sm leading-7"/></div> : !editingText && renderedTextPreview && extension === "json" ? <pre className="size-full overflow-auto bg-[#171b2c] p-5 font-mono text-xs leading-6 text-[#d9dcf0]">{(() => { try { return JSON.stringify(JSON.parse(textContent), null, 2); } catch { return textContent; } })()}</pre> : renderReadOnlyTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] px-2 py-1.5 text-[#34394e]">{cell}</td>)}</tr>)}</tbody></table></div> : renderEditableTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] p-0"><input aria-label={uiText`第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列`} value={cell} onChange={(event) => updateTableCell(rowIndex, columnIndex, event.target.value)} className="h-8 w-full min-w-32 bg-white px-2 outline-none focus:bg-[#f1f0ff]"/></td>)}</tr>)}</tbody></table></div> : editingText ? <div className="flex size-full flex-col"><ReviewTextEditor value={textContent} baseline={textReviews[0]?.before} locked={Boolean(pendingReviews||reviewBusy)} onChange={(event)=>{if(pendingReviews||reviewBusy)return;setTextContent(event.target.value);setTextHistory(history=>({...history,redo:[]}));setDirty(true);}}/>{tableMode && tableCellCount > 12_000 ? <p className="shrink-0 border-t border-[#e2e4ed] bg-[#fff8e8] px-3 py-2 text-[0.625rem] font-semibold text-[#9a6d24]">{uiText("表格数据量较大，已切换为高性能文本编辑模式，保存时不会截断内容。")}</p> : null}</div> : <pre data-moki-selection-text="source" data-moki-text-source="true" className="size-full overflow-auto whitespace-pre-wrap bg-white p-5 font-mono text-[0.75rem] leading-6 text-[#30364b]">{textContent}</pre> : null}
+        {kind === "text" ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在读取文本")}</span></div> : htmlPreview ? <HtmlPreview title={uiText`${item.name} HTML 预览`} source={textContent} active={active&&!exitIntent&&!libraryImagePickerOpen}
+          changes={textReviews.length?textChanges(textReviews[0].before,textContent):[]}
+          onSelection={selected=>publishPreviewSelection(selected)} onQuote={(selected,anchor)=>{
+            selectedPreview.current=selected;mokiAssistancePendingRef.current=true;mokiEditorAssistantOpenedRef.current=true;
+            requestMokiAssistance(publishPreviewSelection(selected),'',{anchor,preferInline:true,prefillPrompt:false,editorAssist:true,quoteSelection:true});
+          }}/> : !editingText && renderedTextPreview && ["md", "markdown"].includes(extension) ? <div className="size-full overflow-auto bg-white p-6"><MarkdownRenderer content={textContent} className="mx-auto max-w-4xl text-sm leading-7"/></div> : !editingText && renderedTextPreview && extension === "json" ? <pre className="size-full overflow-auto bg-[#171b2c] p-5 font-mono text-xs leading-6 text-[#d9dcf0]">{(() => { try { return JSON.stringify(JSON.parse(textContent), null, 2); } catch { return textContent; } })()}</pre> : renderReadOnlyTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] px-2 py-1.5 text-[#34394e]">{cell}</td>)}</tr>)}</tbody></table></div> : renderEditableTable ? <div className="size-full overflow-auto bg-white p-3"><table className="min-w-full border-collapse text-[0.6875rem]"><tbody>{tableRows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className="min-w-32 border border-[#e1e3ec] p-0"><input aria-label={uiText`第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列`} value={cell} onChange={(event) => updateTableCell(rowIndex, columnIndex, event.target.value)} className="h-8 w-full min-w-32 bg-white px-2 outline-none focus:bg-[#f1f0ff]"/></td>)}</tr>)}</tbody></table></div> : editingText ? <div className="flex size-full flex-col"><ReviewTextEditor value={textContent} baseline={textReviews[0]?.before} locked={Boolean(pendingReviews||reviewBusy)} onChange={(event)=>{if(pendingReviews||reviewBusy)return;setTextContent(event.target.value);setTextHistory(history=>({...history,redo:[]}));setDirty(true);}}/>{tableMode && tableCellCount > 12_000 ? <p className="shrink-0 border-t border-[#e2e4ed] bg-[#fff8e8] px-3 py-2 text-[0.625rem] font-semibold text-[#9a6d24]">{uiText("表格数据量较大，已切换为高性能文本编辑模式，保存时不会截断内容。")}</p> : null}</div> : <pre data-moki-selection-text="source" data-moki-text-source="true" className="size-full overflow-auto whitespace-pre-wrap bg-white p-5 font-mono text-[0.75rem] leading-6 text-[#30364b]">{textContent}</pre> : null}
         {["document", "spreadsheet"].includes(kind) && !editingOffice ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在解析 Office 文件")}</span></div> : structuredPreview?.kind === "document" ? <article className="size-full overflow-auto bg-[#eef0f5] p-6"><div data-testid="office-document-preview" className="mx-auto min-h-full max-w-3xl rounded-sm bg-white px-12 py-10 text-sm leading-7 text-[#30364b] shadow-sm [&_p]:mb-3 [&_p]:whitespace-pre-wrap [&_table]:my-5 [&_table]:w-full [&_table]:border-collapse [&_td]:min-w-20 [&_td]:border [&_td]:border-[#d9dce6] [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">{structuredPreview.html ? <div className="contents" dangerouslySetInnerHTML={{ __html: structuredPreview.html }}/> : structuredPreview.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div></article> : structuredPreview?.kind === "spreadsheet" ? <SpreadsheetPreview sheets={structuredPreview.sheets} activeSheetIndex={activeSheetIndex} onActiveSheetIndex={setActiveSheetIndex}/> : <div className="grid size-full place-items-center text-sm font-bold text-[#7c8294]">{uiText("无法解析此 Office 文件")}</div> : null}
         {active && kind === "presentation" && extension === "key" && !editingOffice ? loading ? <div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在解析演示文稿")}</span></div> : structuredPreview?.kind === "presentation" ? <StructuredPresentationSlides preview={structuredPreview}/> : <div className="grid size-full place-items-center text-sm font-bold text-[#7c8294]">{uiText("无法解析此演示文稿")}</div> : null}
         {active && kind === "presentation" && ["ppt", "pptx"].includes(extension) && !editingOffice ? <div ref={presentationPreviewRef} data-moki-page-number={presentationSlideIndex + 1} className="size-full min-h-0 overflow-hidden"><Suspense fallback={<div role="status" className="grid size-full place-items-center"><span className="flex items-center gap-2 text-[0.75rem] font-bold text-[#6860c2]"><LoaderCircle size={16} className="animate-spin"/>{uiText("正在加载 PowerPoint 预览器")}</span></div>}>

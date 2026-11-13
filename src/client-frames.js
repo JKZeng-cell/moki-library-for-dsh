@@ -38,7 +38,7 @@ export function createFramePool(isDark,ctx,quote,settings) {
   async function openPreview(entry,message) {
     const session=entry.chatSession || entry.state.chatTarget || entry.id
     // The catalog iframe moves between DSH surfaces without reloading its URL.
-    const destination=previewDestination(settings.getSnapshot().value?.previewMode ?? entry.initialPreviewMode,entry.mode,message.destination)
+    const destination=message.fromFileAction && settings.getSnapshot().value?.previewMode==='system' ? 'main' : previewDestination(settings.getSnapshot().value?.previewMode ?? entry.initialPreviewMode,entry.mode,message.destination)
     if(destination==='system')return {destination}
     if(destination==='sidebar' || destination==='main'){
       if((await windows('dock-open',{id:message.id,destination})).moving){
@@ -321,7 +321,12 @@ export function createFramePool(isDark,ctx,quote,settings) {
   document.addEventListener('focusin',focusComposer)
   window.addEventListener('focus',focusComposer)
   void poll()
-  return {entryFor,attach,connect,update,compose,send,bindChat,windows,destroy,onCommand(fn){onCommand=fn},dispose() {
+  return {entryFor,attach,connect,update,compose,send,bindChat,windows,destroy,
+    openFile(item,sessionId){
+      const catalog=[...entries.values()].find(e=>e.host && e.mode==='side' && e.chatSession===sessionId)
+      const entry=catalog || {id:sessionId,chatSession:sessionId,mode:'main',state:{}}
+      return openPreview(entry,{id:item.id,name:item.name,fromFileAction:true})
+    },onCommand(fn){onCommand=fn},dispose() {
     disposed=true;clearTimeout(timer)
     drag.dispose()
     window.removeEventListener('message',onMessage)

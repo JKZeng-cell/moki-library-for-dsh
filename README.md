@@ -55,9 +55,9 @@ Tested on **Windows with DSH Desktop 0.2.2-rc.1**. Declared compatibility: `>=0.
 Please install the MOKI Library plugin in my current DSH Desktop, including the download, installation and version verification.
 
 Repository: https://github.com/JKZeng-cell/moki-library-for-dsh
-Version: 0.1.73
-Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.73/dsh-moki-library-0.1.73.tgz
-SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.73/SHA256SUMS.txt
+Version: 0.1.74
+Package: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.74/dsh-moki-library-0.1.74.tgz
+SHA256 checksum manifest: https://github.com/JKZeng-cell/moki-library-for-dsh/releases/download/v0.1.74/SHA256SUMS.txt
 
 Follow these steps:
 1. Check the operating system, DSH version and the Node.js runtime it uses. The plugin requires DSH >=0.2.2-rc.1 <0.3.0 and Node.js >=22.19. Windows Desktop is the primary verified environment.
@@ -67,7 +67,7 @@ Follow these steps:
    dsh plugin --profile desktop add "dsh-moki-library@file:<absolute-archive-path>" --allow-build=sharp
 5. Check the installed version:
    dsh plugin --profile desktop list dsh-moki-library --depth 0
-   Confirm that desktop lists version 0.1.73 (or the newer version retained above). Preserve existing plugins, configuration and library data.
+   Confirm that desktop lists version 0.1.74 (or the newer version retained above). Preserve existing plugins, configuration and library data.
 6. Report the archive location, actual CLI, profile and version-check result. Then ask me to save my work, fully quit DSH and reopen it manually. Keep the current DSH conversation running while the installation task is in progress.
 
 If this conversation cannot download files or execute a terminal, the environment is incompatible, or installation fails, explain the specific cause and next step. Report installation status from the actual command results.
@@ -81,12 +81,12 @@ If this conversation cannot download files or execute a terminal, the environmen
 
 ### Option 2: Install manually in a terminal
 
-1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.73.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.73).
+1. Open DSH Desktop once to initialize its desktop profile, then fully quit it. Download `dsh-moki-library-0.1.74.tgz` from the [release](https://github.com/JKZeng-cell/moki-library-for-dsh/releases/tag/v0.1.74).
 2. In PowerShell, replace the first two paths with the actual CLI and archive paths. If the desktop uses a custom `DSH_HOME`, use the same value in this terminal.
 
 ```powershell
 $mokiDshCli = 'C:\Path\To\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'
-$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.73.tgz'
+$mokiArchive = 'C:\Downloads\dsh-moki-library-0.1.74.tgz'
 $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 & $mokiDshCli plugin --profile desktop add "dsh-moki-library@file:$mokiArchive" --allow-build=sharp
 ```
@@ -100,6 +100,8 @@ $mokiArchive = (Resolve-Path -LiteralPath $mokiArchive).Path.Replace('\', '/')
 If `dsh` is on PATH and belongs to the current desktop installation, use it in place of `& $mokiDshCli`. `--profile desktop` targets the desktop profile; `--allow-build=sharp` allows the installation build step for the `sharp` image dependency. Initial installation requires network access for runtime dependencies. See the [official DSH CLI reference](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cli-help.md#dsh-plugin) for profile command syntax.
 
 The GitHub source archive is for development; the `.tgz` release asset is the built plugin. This release does not require an npm publication.
+
+If DSH reports `tool "moki_library_context" parameters must be lossless JSON before schema projection`, update to **0.1.74 or later**, then fully quit and reopen DSH. Earlier plugin versions passed Zod's hidden metadata along with the tool parameter schema, which strict DSH JSON validation rejects. Version 0.1.74 registers plain JSON schemas for every library tool while preserving parameter constraints and runtime validation. This error occurs during model request preparation, before the selection is read.
 
 ## Selection collaboration
 

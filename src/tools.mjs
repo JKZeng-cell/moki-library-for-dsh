@@ -15,7 +15,14 @@ import {compactSelection,selectionData} from './selection-context.js'
 import {selectionEdits} from './selection-edit.mjs'
 
 const id=z.string().uuid(), version=z.string().regex(/^[a-f0-9]{64}$/), limit=z.number().int().min(1).max(100).default(30)
-const props=schema=>{const result=z.toJSONSchema(schema,{io:'input',unrepresentable:'any'});delete result.$schema;return result}
+const props=schema=>{
+  const result=z.toJSONSchema(schema,{io:'input',unrepresentable:'any'})
+  delete result.$schema
+  // Zod adds non-enumerable ~standard metadata with callable validators.
+  // DSH requires the schema object itself to be lossless JSON, so register
+  // its JSON representation and keep runtime validation in schema.parse.
+  return JSON.parse(JSON.stringify(result))
+}
 const compact=({thumbnailDataUrl,...item})=>item
 const explain=(action,property)=>action+'\n'+JSON.stringify(property,null,2).slice(0,5000)
 async function fileVersion(path) {
